@@ -1,0 +1,147 @@
+name: CI/CD Solicitud Permisos
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build
+    runs-on: [self-hosted, Linux, X64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Install Frontend Dependencies
+        run: pnpm install
+
+      - name: Build Frontend (SvelteKit)
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+        run: pnpm run build
+
+      - name: Build Backend (Go)
+        working-directory: backend
+        run: go build -o ../bin/backend ./cmd/main.go
+
+  deploy:
+    name: Deploy
+    runs-on: [self-hosted, Linux, X64]
+    needs: [build]
+
+    steps:
+      - name: Verificar y clonar repositorio
+        run: |
+          REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          DEPLOY_PATH="/var/www/operaciones/Mi_Programacion_Solicitud_de_permisos"
+
+          if [ -d "$DEPLOY_PATH/.git" ]; then
+            echo "Repositorio existe, actualizando..."
+            cd "$DEPLOY_PATH"
+            git remote set-url origin "$REPO_URL"
+            git fetch origin main
+            git reset --hard origin/main
+          else
+            echo "Repositorio no existe, clonando..."
+            mkdir -p /var/www/operaciones
+            cd /var/www/operaciones
+            if [ -d "Mi_Programacion_Solicitud_de_permisos" ]; then
+              rm -rf Mi_Programacion_Solicitud_de_permisos
+            fi
+            git clone "$REPO_URL" Mi_Programacion_Solicitud_de_permisos
+            cd Mi_Programacion_Solicitud_de_permisos
+            git checkout main
+          fi
+
+      - name: Crear archivo .env (Frontend)
+        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos
+        run: |
+          touch .env
+          echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> .env
+
+      - name: Crear archivo .env (Backend)
+        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos/backend
+        run: |
+          touch .env
+          echo "SERVER_HOST=${{ secrets.SERVER_HOST }}" >> .env
+          echo "SERVER_PORT=${{ secrets.SERVER_PORT }}" >> .env
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
+          echo "DB_DATABASE=${{ secrets.DB_DATABASE }}" >> .env
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "UNOEE_HOST=${{ secrets.UNOEE_HOST }}" >> .env
+          echo "UNOEE_PORT=${{ secrets.UNOEE_PORT }}" >> .env
+          echo "UNOEE_DATABASE=${{ secrets.UNOEE_DATABASE }}" >> .env
+          echo "UNOEE_USER=${{ secrets.UNOEE_USER }}" >> .env
+          echo "UNOEE_PASSWORD=${{ secrets.UNOEE_PASSWORD }}" >> .env
+          echo "SP_HOST=${{ secrets.SP_HOST }}" >> .env
+          echo "SP_PORT=${{ secrets.SP_PORT }}" >> .env
+          echo "SP_DATABASE=${{ secrets.SP_DATABASE }}" >> .env
+          echo "SP_USER=${{ secrets.SP_USER }}" >> .env
+          echo "SP_PASSWORD=${{ secrets.SP_PASSWORD }}" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "JWT_EXPIRATION_HOURS=${{ secrets.JWT_EXPIRATION_HOURS }}" >> .env
+          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> .env
+          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> .env
+          echo "AWS_STORAGE_BUCKET_NAME=${{ secrets.AWS_STORAGE_BUCKET_NAME }}" >> .env
+          echo "AWS_S3_REGION_NAME=${{ secrets.AWS_S3_REGION_NAME }}" >> .env
+          echo "FESTIVOS_API_KEY=${{ secrets.FESTIVOS_API_KEY }}" >> .env
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Instalar dependencias Frontend
+        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos
+        run: pnpm install
+
+      - name: Build Frontend
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos
+        run: pnpm run build
+
+      - name: Build Backend (Go)
+        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos/backend
+        run: go build -o ../bin/backend ./cmd/main.go
+
+      - name: Reiniciar con PM2 (Backend - puerto 3048)
+        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos
+        run: |
+          pm2 delete solicitud_permisos_back || true
+          SERVER_PORT=3048 pm2 start bin/backend --name "solicitud_permisos_back"
+          pm2 save
+
+      - name: Reiniciar con PM2 (Frontend - puerto 3047)
+        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos
+        run: |
+          pm2 delete solicitud_permisos_front || true
+          pm2 start "pnpm preview -- --port 3047" --name "solicitud_permisos_front"
+          pm2 save
+
+      - name: Deploy completado
+        run: echo "Deploy exitoso - Aplicaciones corriendo con PM2"
