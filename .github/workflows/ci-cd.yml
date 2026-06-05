@@ -50,7 +50,7 @@ jobs:
       - name: Verificar y clonar repositorio
         run: |
           REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-          DEPLOY_PATH="/var/www/operaciones/Mi_Programacion_Solicitud_de_permisos"
+          DEPLOY_PATH="/var/www/operaciones/solicitud-permisos-v3"
 
           if [ -d "$DEPLOY_PATH/.git" ]; then
             echo "Repositorio existe, actualizando..."
@@ -62,22 +62,22 @@ jobs:
             echo "Repositorio no existe, clonando..."
             mkdir -p /var/www/operaciones
             cd /var/www/operaciones
-            if [ -d "Mi_Programacion_Solicitud_de_permisos" ]; then
-              rm -rf Mi_Programacion_Solicitud_de_permisos
+            if [ -d "solicitud-permisos-v3" ]; then
+              rm -rf solicitud-permisos-v3
             fi
-            git clone "$REPO_URL" Mi_Programacion_Solicitud_de_permisos
-            cd Mi_Programacion_Solicitud_de_permisos
+            git clone "$REPO_URL" solicitud-permisos-v3
+            cd solicitud-permisos-v3
             git checkout main
           fi
 
       - name: Crear archivo .env (Frontend)
-        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos
+        working-directory: /var/www/operaciones/solicitud-permisos-v3
         run: |
           touch .env
           echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> .env
 
       - name: Crear archivo .env (Backend)
-        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos/backend
+        working-directory: /var/www/operaciones/solicitud-permisos-v3/backend
         run: |
           touch .env
           echo "SERVER_HOST=${{ secrets.SERVER_HOST }}" >> .env
@@ -116,31 +116,31 @@ jobs:
           go-version: '1.24'
 
       - name: Instalar dependencias Frontend
-        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos
+        working-directory: /var/www/operaciones/solicitud-permisos-v3
         run: pnpm install
 
       - name: Build Frontend
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos
+        working-directory: /var/www/operaciones/solicitud-permisos-v3
         run: pnpm run build
 
       - name: Build Backend (Go)
-        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos/backend
+        working-directory: /var/www/operaciones/solicitud-permisos-v3/backend
         run: go build -o ../bin/backend ./cmd/main.go
 
-      - name: Reiniciar con PM2 (Backend - puerto 3048)
-        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos
+      - name: Reiniciar con PM2 (Backend)
+        working-directory: /var/www/operaciones/solicitud-permisos-v3
         run: |
           pm2 delete solicitud_permisos_back || true
-          SERVER_PORT=3048 pm2 start bin/backend --name "solicitud_permisos_back"
+          pm2 start bin/backend --name "solicitud_permisos_back"
           pm2 save
 
-      - name: Reiniciar con PM2 (Frontend - puerto 3047)
-        working-directory: /var/www/operaciones/Mi_Programacion_Solicitud_de_permisos
+      - name: Reiniciar con PM2 (Frontend)
+        working-directory: /var/www/operaciones/solicitud-permisos-v3
         run: |
           pm2 delete solicitud_permisos_front || true
-          pm2 start "pnpm preview -- --port 3047" --name "solicitud_permisos_front"
+          pm2 start pnpm --name "solicitud_permisos_front" -- start
           pm2 save
 
       - name: Deploy completado
