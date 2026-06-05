@@ -1,0 +1,1 @@
+export type { Subpolitica, Politica, PermisosTiposResponse } from '../services/permisos.service';

@@ -1,0 +1,80 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+
+@theme {
+  --color-primario: rgb(76, 194, 83);
+  --color-primario-dark: rgb(60, 170, 68);
+  --color-primario-light: rgb(100, 210, 107);
+
+  --color-fondo-app: #ffffff;
+  --color-fondo-soft: #f4f7f8;
+
+  --color-texto-dark: #2c3e50;
+  --color-texto-grey: #a0a6ae;
+
+  --color-error: #e74c3c;
+  --color-error-soft: #fdeaea;
+
+  --color-icono: #a0a6ae;
+
+  --shadow-input-focus: 0px 5px 20px 0px rgba(76, 194, 83, 0.15);
+  --shadow-button: 0px 10px 20px -10px rgba(76, 194, 83, 0.5);
+  --shadow-button-hover: 0px 15px 30px -8px rgba(76, 194, 83, 0.55);
+  --shadow-button-active: 0px 5px 10px -5px rgba(76, 194, 83, 0.3);
+
+  --font-display: 'Poppins', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+
+  --animate-fade-in: fadeIn 0.4s ease-out;
+  --animate-slide-up: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-slide-up-delay-1: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
+  --animate-slide-up-delay-2: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
+  --animate-slide-up-delay-3: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
+  --animate-slide-up-delay-4: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s both;
+  --animate-slide-up-delay-5: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s both;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-texto-dark);
+  background-color: var(--color-fondo-app);
+}
+
+input::placeholder {
+  color: var(--color-texto-grey);
+  opacity: 0.6;
+}
+
+input:focus {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-primario);
+  outline-offset: 2px;
+}

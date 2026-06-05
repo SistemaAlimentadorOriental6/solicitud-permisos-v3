@@ -1,0 +1,1 @@
+export type { Solicitud, SolicitudesResponse, SolicitudesPendientesResponse, SolicitudesAllResponse, SolicitudesRecientesResponse } from '../services/solicitudes.service';

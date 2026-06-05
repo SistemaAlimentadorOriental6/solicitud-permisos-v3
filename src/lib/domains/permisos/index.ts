@@ -1,0 +1,3 @@
+export { permisosStore, permisosLoading, permisosError, permisosTipos, permisosPoliticas } from './stores/permisos.store';
+export type { Subpolitica, Politica, PermisosTiposResponse, CreatePermisoRequest, CreatePermisoResponse, CreateExtemporaneoRequest, CreateExtemporaneoResponse, EmpleadoDetalle, EmpleadosResponse } from './services/permisos.service';
+export { getEmpleados } from './services/permisos.service';
