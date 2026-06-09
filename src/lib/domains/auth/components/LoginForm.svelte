@@ -39,8 +39,10 @@
 
   function handleSubmit() {
     clearErrors();
+    console.log('[LOGIN DEBUG] Valores ingresados:', { codigo, cedula });
 
     const validationError = validateLoginForm(codigo, cedula);
+    console.log('[LOGIN DEBUG] Resultado validación:', validationError);
 
     if (validationError) {
       if (validationError.includes("cédula")) {
@@ -52,6 +54,7 @@
     }
 
     authStore.login(codigo, cedula).then((result) => {
+      console.log('[LOGIN DEBUG] Resultado authStore.login:', result);
       if (!result.success && result.error) {
         formError = result.error;
       } else if (result.success) {

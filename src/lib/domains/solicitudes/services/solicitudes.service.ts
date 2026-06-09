@@ -3,6 +3,7 @@ import { API_BASE_URL } from '$lib/shared/config/api';
 export interface Solicitud {
   id: number;
   cedula: string;
+  codigo?: string;
   nombre_empleado: string;
   foto: string;
   fecha_solicitud: string;

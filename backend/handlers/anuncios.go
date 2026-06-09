@@ -56,6 +56,12 @@ func CrearAnuncio(c *fiber.Ctx) error {
 		})
 	}
 
+	// Normalizar tipo
+	tipo := req.Tipo
+	if tipo != "operaciones" && tipo != "mantenimiento" {
+		tipo = "operaciones"
+	}
+
 	claims := c.Locals("user").(*utils.Claims)
 
 	mysqlDB := db.GetSolicitudPermisosDB()
@@ -72,7 +78,7 @@ func CrearAnuncio(c *fiber.Ctx) error {
 	}
 	defer tx.Rollback()
 
-	_, err = tx.ExecContext(ctx, "UPDATE anuncios_video SET activo = 0 WHERE activo = 1")
+	_, err = tx.ExecContext(ctx, "UPDATE anuncios_video SET activo = 0 WHERE activo = 1 AND tipo = ?", tipo)
 	if err != nil {
 		log.Printf("Error desactivando anuncios: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(models.AnuncioResponse{
@@ -82,8 +88,8 @@ func CrearAnuncio(c *fiber.Ctx) error {
 	}
 
 	result, err := tx.ExecContext(ctx,
-		"INSERT INTO anuncios_video (video_id, url, titulo, activo, creado_por) VALUES (?, ?, ?, 1, ?)",
-		videoID, req.Url, req.Titulo, claims.Cedula,
+		"INSERT INTO anuncios_video (video_id, url, titulo, activo, creado_por, tipo) VALUES (?, ?, ?, 1, ?, ?)",
+		videoID, req.Url, req.Titulo, claims.Cedula, tipo,
 	)
 	if err != nil {
 		log.Printf("Error insertando anuncio: %v", err)
@@ -107,12 +113,13 @@ func CrearAnuncio(c *fiber.Ctx) error {
 		Success: true,
 		Message: "Anuncio creado exitosamente",
 		Anuncio: &models.AnuncioDetalle{
-			ID:       uint(id),
-			VideoID:  videoID,
-			Url:      req.Url,
-			Titulo:   req.Titulo,
-			Activo:   true,
+			ID:        uint(id),
+			VideoID:   videoID,
+			Url:       req.Url,
+			Titulo:    req.Titulo,
+			Activo:    true,
 			CreadoPor: claims.Cedula,
+			Tipo:      tipo,
 		},
 	})
 }
@@ -122,12 +129,19 @@ func GetAnuncioActivo(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// Obtener tipo de query param (opcional, default 'operaciones')
+	tipo := c.Query("tipo", "operaciones")
+	if tipo != "operaciones" && tipo != "mantenimiento" {
+		tipo = "operaciones"
+	}
+
 	var anuncio models.AnuncioDetalle
 	var activo int
 
 	err := mysqlDB.QueryRowContext(ctx,
-		"SELECT id, video_id, url, titulo, activo, creado_por FROM anuncios_video WHERE activo = 1 ORDER BY fecha_creacion DESC LIMIT 1",
-	).Scan(&anuncio.ID, &anuncio.VideoID, &anuncio.Url, &anuncio.Titulo, &activo, &anuncio.CreadoPor)
+		"SELECT id, video_id, url, titulo, activo, creado_por, tipo FROM anuncios_video WHERE activo = 1 AND tipo = ? ORDER BY fecha_creacion DESC LIMIT 1",
+		tipo,
+	).Scan(&anuncio.ID, &anuncio.VideoID, &anuncio.Url, &anuncio.Titulo, &activo, &anuncio.CreadoPor, &anuncio.Tipo)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -159,7 +173,7 @@ func ListarAnuncios(c *fiber.Ctx) error {
 	defer cancel()
 
 	rows, err := mysqlDB.QueryContext(ctx,
-		`SELECT a.id, a.video_id, a.url, a.titulo, a.activo, a.creado_por, a.fecha_creacion,
+		`SELECT a.id, a.video_id, a.url, a.titulo, a.activo, a.creado_por, a.fecha_creacion, a.tipo,
 				(SELECT COUNT(*) FROM anuncios_vistas WHERE anuncio_id = a.id) as vistas
 		 FROM anuncios_video a ORDER BY a.fecha_creacion DESC`,
 	)
@@ -179,7 +193,7 @@ func ListarAnuncios(c *fiber.Ctx) error {
 		var activo int
 		var fechaCreacion time.Time
 
-		if err := rows.Scan(&a.ID, &a.VideoID, &a.Url, &a.Titulo, &activo, &a.CreadoPor, &fechaCreacion, &a.TotalVistas); err != nil {
+		if err := rows.Scan(&a.ID, &a.VideoID, &a.Url, &a.Titulo, &activo, &a.CreadoPor, &fechaCreacion, &a.Tipo, &a.TotalVistas); err != nil {
 			log.Printf("Error scanning anuncio: %v", err)
 			continue
 		}
@@ -220,6 +234,23 @@ func ActualizarAnuncio(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// Obtener el tipo del anuncio para desactivar solo los del mismo tipo
+	var tipoAnuncio string
+	err := mysqlDB.QueryRowContext(ctx, "SELECT tipo FROM anuncios_video WHERE id = ?", id).Scan(&tipoAnuncio)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(fiber.StatusNotFound).JSON(models.AnuncioResponse{
+				Success: false,
+				Message: "Anuncio no encontrado",
+			})
+		}
+		log.Printf("Error consultando tipo de anuncio: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(models.AnuncioResponse{
+			Success: false,
+			Message: "Error al actualizar anuncio",
+		})
+	}
+
 	tx, err := mysqlDB.BeginTx(ctx, nil)
 	if err != nil {
 		log.Printf("Error iniciando transacción: %v", err)
@@ -231,7 +262,7 @@ func ActualizarAnuncio(c *fiber.Ctx) error {
 	defer tx.Rollback()
 
 	if req.Activo {
-		_, err = tx.ExecContext(ctx, "UPDATE anuncios_video SET activo = 0 WHERE activo = 1")
+		_, err = tx.ExecContext(ctx, "UPDATE anuncios_video SET activo = 0 WHERE activo = 1 AND tipo = ?", tipoAnuncio)
 		if err != nil {
 			log.Printf("Error desactivando anuncios: %v", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(models.AnuncioResponse{

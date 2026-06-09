@@ -94,7 +94,9 @@ function createAuthStore() {
 
       try {
         const request: LoginRequest = { codigo, cedula };
+        console.log('[AUTH DEBUG] Enviando login:', { codigo, cedula });
         const response: LoginResponse = await loginApi(request);
+        console.log('[AUTH DEBUG] Respuesta login:', response);
 
         if (!response.success) {
           throw new Error(response.message || 'Error al iniciar sesión');
@@ -123,6 +125,7 @@ function createAuthStore() {
         return { success: true };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Error inesperado';
+        console.error('[AUTH DEBUG] Error en login:', error);
 
         update((state) => ({
           ...state,

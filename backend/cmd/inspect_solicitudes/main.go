@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"solicitud-permisos/db"
-	"solicitud-permisos/models"
 	"solicitud-permisos/utils"
 	appConfig "solicitud-permisos/internal/config"
 )

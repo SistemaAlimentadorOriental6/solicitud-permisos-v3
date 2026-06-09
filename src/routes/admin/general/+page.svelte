@@ -919,7 +919,7 @@
                             </div>
                             <span
                               class="text-[11px] text-slate-400 shrink-0 font-semibold"
-                              >ID:{solicitud.id}</span
+                              >{solicitud.codigo || solicitud.cedula}</span
                             >
                           </div>
 
@@ -1164,7 +1164,7 @@
                   </div>
                   <span
                     class="text-[11px] text-slate-400 shrink-0 font-semibold"
-                    >ID:{sol.id}</span
+                    >{sol.codigo || sol.cedula}</span
                   >
                 </div>
 

@@ -140,9 +140,9 @@
       .split(",")
       .map((d) => d.trim())
       .map((date) => {
-        const parsed = new Date(date);
-        if (isNaN(parsed.getTime())) return date;
-        return `${parsed.getDate()} de ${MESES[parsed.getMonth()]}, ${parsed.getFullYear()}`;
+        const [y, m, d] = date.split("-").map(Number);
+        if (!y || !m || !d) return date;
+        return `${d} de ${MESES[m - 1]}, ${y}`;
       })
       .join(" | ");
   }

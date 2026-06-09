@@ -133,14 +133,14 @@ jobs:
         working-directory: /var/www/operaciones/solicitud-permisos-v3
         run: |
           pm2 delete solicitud_permisos_back || true
-          pm2 start bin/backend --name "solicitud_permisos_back"
+          pm2 start bin --name "solicitud_permisos_back"
           pm2 save
 
-      - name: Reiniciar con PM2 (Frontend)
+      - name: Reiniciar con PM2 (Frontend - puerto 3047)
         working-directory: /var/www/operaciones/solicitud-permisos-v3
         run: |
           pm2 delete solicitud_permisos_front || true
-          pm2 start pnpm --name "solicitud_permisos_front" -- start
+          pm2 start "pnpm run preview" --name solicitud_permisos_front
           pm2 save
 
       - name: Deploy completado

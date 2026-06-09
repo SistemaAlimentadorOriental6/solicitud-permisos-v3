@@ -80,12 +80,18 @@
 
   const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
+  function parseLocalDate(dateStr: string): { day: number; month: number; year: number } | null {
+    const match = dateStr.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (!match) return null;
+    return { year: Number(match[1]), month: Number(match[2]) - 1, day: Number(match[3]) };
+  }
+
   function formatDate(dateStr: string): string {
     if (!dateStr) return 'No especificada';
     return dateStr.split(',').map(d => d.trim()).map(date => {
-      const parsed = new Date(date);
-      if (isNaN(parsed.getTime())) return date;
-      return `${parsed.getDate()} de ${MESES[parsed.getMonth()]}, ${parsed.getFullYear()}`;
+      const parsed = parseLocalDate(date);
+      if (!parsed) return date;
+      return `${parsed.day} de ${MESES[parsed.month]}, ${parsed.year}`;
     }).join(' | ');
   }
 
@@ -120,24 +126,26 @@
   }
 
   function getDayOfWeek(dateStr: string): string {
-    const parsed = new Date(dateStr.trim());
-    if (isNaN(parsed.getTime())) return '';
+    const parsed = parseLocalDate(dateStr);
+    if (!parsed) return '';
+    const d = new Date(parsed.year, parsed.month, parsed.day);
     const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    return dias[parsed.getDay()];
+    return dias[d.getDay()];
   }
 
   function getParsedDates(): Array<{ raw: string; day: string; dayNum: string; month: string; year: string }> {
     if (!solicitud?.fecha_solicitud) return [];
     return solicitud.fecha_solicitud.split(',').map(d => d.trim()).map(date => {
-      const parsed = new Date(date);
-      if (isNaN(parsed.getTime())) return { raw: date, day: '', dayNum: '', month: '', year: '' };
+      const parsed = parseLocalDate(date);
+      if (!parsed) return { raw: date, day: '', dayNum: '', month: '', year: '' };
+      const d = new Date(parsed.year, parsed.month, parsed.day);
       const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
       return {
         raw: date,
-        day: diasSemana[parsed.getDay()],
-        dayNum: parsed.getDate().toString(),
-        month: MESES[parsed.getMonth()],
-        year: parsed.getFullYear().toString(),
+        day: diasSemana[d.getDay()],
+        dayNum: parsed.day.toString(),
+        month: MESES[parsed.month],
+        year: parsed.year.toString(),
       };
     });
   }
@@ -256,9 +264,9 @@
   }
 
   async function loadHistorial() {
-    if (!solicitud?.cedula) return;
+    const identificador = solicitud?.codigo || solicitud?.cedula;
+    if (!identificador) return;
     if (historialLoading || historialLoaded) return;
-    const identificador = solicitud.cedula;
     const solicitudId = solicitud.id;
     historialLoading = true;
     try {

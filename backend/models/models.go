@@ -43,6 +43,7 @@ type Empleado struct {
 	FDescCargo   string     `json:"f_desc_cargo"`
 	FDescCcosto  string     `json:"f_desc_ccosto"`
 	FFechaRetiro *time.Time `json:"f_fecha_retiro"`
+	FNdc         int        `json:"f_ndc"`
 }
 
 type UsuarioAdmin struct {
@@ -83,6 +84,7 @@ type SolicitudResponse struct {
 type SolicitudDetalle struct {
 	ID             uint   `json:"id"`
 	Cedula         string `json:"cedula"`
+	Codigo         string `json:"codigo,omitempty"`
 	NombreEmpleado string `json:"nombre_empleado"`
 	Foto           string `json:"foto,omitempty"`
 	FechaSolicitud string `json:"fecha_solicitud"`
@@ -185,6 +187,7 @@ type EmpleadosResponse struct {
 type CrearAnuncioRequest struct {
 	Url    string `json:"url"`
 	Titulo string `json:"titulo,omitempty"`
+	Tipo   string `json:"tipo,omitempty"`
 }
 
 type ActualizarAnuncioRequest struct {
@@ -199,6 +202,7 @@ type AnuncioDetalle struct {
 	Titulo    string `json:"titulo,omitempty"`
 	Activo    bool   `json:"activo"`
 	CreadoPor string `json:"creado_por,omitempty"`
+	Tipo      string `json:"tipo,omitempty"`
 }
 
 type AnuncioConVistas struct {
@@ -210,6 +214,7 @@ type AnuncioConVistas struct {
 	CreadoPor     string `json:"creado_por,omitempty"`
 	FechaCreacion string `json:"fecha_creacion"`
 	TotalVistas   int    `json:"total_vistas"`
+	Tipo          string `json:"tipo,omitempty"`
 }
 
 type AnuncioResponse struct {

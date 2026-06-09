@@ -22,13 +22,17 @@ func Login(c *fiber.Ctx) error {
 	var req models.LoginRequest
 
 	if err := c.BodyParser(&req); err != nil {
+		log.Printf("[LOGIN DEBUG] Error BodyParser: %v", err)
 		return c.Status(fiber.StatusBadRequest).JSON(models.LoginResponse{
 			Success: false,
 			Message: "Datos inválidos",
 		})
 	}
 
+	log.Printf("[LOGIN DEBUG] Intento de login - Codigo: '%s', Cedula: '%s'", req.Codigo, req.Cedula)
+
 	if req.Cedula == "" {
+		log.Printf("[LOGIN DEBUG] Cedula vacía")
 		return c.Status(fiber.StatusBadRequest).JSON(models.LoginResponse{
 			Success: false,
 			Message: "La cédula es requerida",
@@ -51,11 +55,14 @@ func Login(c *fiber.Ctx) error {
 		}
 
 		if esAdmin {
+			log.Printf("[LOGIN DEBUG] Es admin, buscando por codigo: '%s'", req.Codigo)
 			usuario, err := findUsuarioAdminByCodigo(req.Codigo, req.Cedula)
 			if err != nil {
+				log.Printf("[LOGIN DEBUG] No encontro por codigo, intentando por usuario: '%s'", req.Codigo)
 				// Intentar buscar por campo 'usuario' si no encuentra por código
 				usuario, err = findUsuarioAdminByUsuario(req.Codigo, req.Cedula)
 				if err != nil {
+					log.Printf("[LOGIN DEBUG] Admin no encontrado por codigo ni usuario: '%s', cedula: '%s'", req.Codigo, req.Cedula)
 					return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
 						Success: false,
 						Message: "Usuario o contraseña incorrectos",
@@ -67,16 +74,21 @@ func Login(c *fiber.Ctx) error {
 			codigo = usuario.Codigo
 			nombre = usuario.NombreCompleto
 			cargo = usuario.Cargo
+			log.Printf("[LOGIN DEBUG] Admin encontrado: %s", nombre)
 		} else {
+			log.Printf("[LOGIN DEBUG] Buscando operador por codigo: '%s'", req.Codigo)
 			operador, err := findOperadorByCodigo(req.Codigo)
 			if err != nil {
+				log.Printf("[LOGIN DEBUG] Operador no encontrado por codigo '%s': %v", req.Codigo, err)
 				return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
 					Success: false,
 					Message: "Usuario o contraseña incorrectos",
 				})
 			}
 
+			log.Printf("[LOGIN DEBUG] Operador encontrado - Codigo: '%s', Empleado en DB: '%s', Cedula ingresada: '%s'", operador.CodigoOperador, operador.Empleado, req.Cedula)
 			if strings.TrimSpace(operador.Empleado) != req.Cedula {
+				log.Printf("[LOGIN DEBUG] La cedula del operador no coincide. DB: '%s' vs Input: '%s'", operador.Empleado, req.Cedula)
 				return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
 					Success: false,
 					Message: "Usuario o contraseña incorrectos",
@@ -85,6 +97,7 @@ func Login(c *fiber.Ctx) error {
 
 			empleado, err := findEmpleadoByCedula(req.Cedula)
 			if err != nil {
+				log.Printf("[LOGIN DEBUG] Empleado no encontrado por cedula '%s': %v", req.Cedula, err)
 				return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
 					Success: false,
 					Message: "Usuario o contraseña incorrectos",
@@ -92,6 +105,7 @@ func Login(c *fiber.Ctx) error {
 			}
 
 			if empleado.FFechaRetiro != nil {
+				log.Printf("[LOGIN DEBUG] Empleado con fecha de retiro: %v (f_ndc: %d)", empleado.FFechaRetiro, empleado.FNdc)
 				return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
 					Success: false,
 					Message: "Usuario o contraseña incorrectos",
@@ -102,10 +116,13 @@ func Login(c *fiber.Ctx) error {
 			codigo = req.Codigo
 			nombre = empleado.FNombreEmpl
 			cargo = empleado.FDescCargo
+			log.Printf("[LOGIN DEBUG] Empleado operaciones OK: %s (f_ndc: %d)", nombre, empleado.FNdc)
 		}
 	} else {
+		log.Printf("[LOGIN DEBUG] Sin codigo, buscando empleado mantenimiento por cedula: '%s'", req.Cedula)
 		empleado, err := findMantenimientoEmpleadoByCedula(req.Cedula)
 		if err != nil {
+			log.Printf("[LOGIN DEBUG] Empleado mantenimiento no encontrado por cedula '%s': %v", req.Cedula, err)
 			return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
 				Success: false,
 				Message: "Usuario o contraseña incorrectos",
@@ -113,6 +130,7 @@ func Login(c *fiber.Ctx) error {
 		}
 
 		if empleado.FFechaRetiro != nil {
+			log.Printf("[LOGIN DEBUG] Empleado mantenimiento con fecha de retiro: %v (f_ndc: %d)", empleado.FFechaRetiro, empleado.FNdc)
 			return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
 				Success: false,
 				Message: "Usuario o contraseña incorrectos",
@@ -123,6 +141,7 @@ func Login(c *fiber.Ctx) error {
 		codigo = ""
 		nombre = empleado.FNombreEmpl
 		cargo = empleado.FDescCargo
+		log.Printf("[LOGIN DEBUG] Empleado mantenimiento OK: %s (f_ndc: %d)", nombre, empleado.FNdc)
 	}
 
 	token, err := utils.GenerateToken(struct {
@@ -215,9 +234,10 @@ func findEmpleadoByCedula(cedula string) (*models.Empleado, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	query := `SELECT f_nit_empl, f_nombre_empl, f_desc_cargo, f_fecha_retiro
+	query := `SELECT TOP 1 f_nit_empl, f_nombre_empl, f_desc_cargo, f_fecha_retiro, f_ndc
 	          FROM SE_W0550
-	          WHERE RTRIM(f_nit_empl) = @cedula`
+	          WHERE RTRIM(f_nit_empl) = @cedula
+	          ORDER BY f_ndc DESC`
 
 	var emp models.Empleado
 	var nitEmpl string
@@ -226,6 +246,7 @@ func findEmpleadoByCedula(cedula string) (*models.Empleado, error) {
 		&emp.FNombreEmpl,
 		&emp.FDescCargo,
 		&emp.FFechaRetiro,
+		&emp.FNdc,
 	)
 	emp.FNitEmpl = strings.TrimSpace(nitEmpl)
 
@@ -302,10 +323,11 @@ func findMantenimientoEmpleadoByCedula(cedula string) (*models.Empleado, error) 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	query := `SELECT f_nit_empl, f_nombre_empl, f_desc_cargo, f_fecha_retiro
+	query := `SELECT TOP 1 f_nit_empl, f_nombre_empl, f_desc_cargo, f_fecha_retiro, f_ndc
 	          FROM SE_W0550
 	          WHERE RTRIM(f_nit_empl) = @cedula
-	          AND f_desc_ccosto IN ('Gestion de Mantenimiento', 'Tecnicos de Mantenimiento')`
+	          AND f_desc_ccosto IN ('Gestion de Mantenimiento', 'Tecnicos de Mantenimiento')
+	          ORDER BY f_ndc DESC`
 
 	var emp models.Empleado
 	var nitEmpl string
@@ -314,6 +336,7 @@ func findMantenimientoEmpleadoByCedula(cedula string) (*models.Empleado, error) 
 		&emp.FNombreEmpl,
 		&emp.FDescCargo,
 		&emp.FFechaRetiro,
+		&emp.FNdc,
 	)
 	emp.FNitEmpl = strings.TrimSpace(nitEmpl)
 
@@ -776,9 +799,10 @@ func ListSolicitudesPendientes(c *fiber.Ctx) error {
 
 	var solicitudes []models.SolicitudDetalle
 	for _, raw := range rawList {
-		var cedulaReal, nombre, foto string
+		var cedulaReal, nombre, foto, codigo string
 
 		if raw.tipoUsuario == "se_operaciones" {
+			codigo = raw.cedula
 			cedulaReal = codigoACedula[raw.cedula]
 		} else {
 			cedulaReal = raw.cedula
@@ -793,6 +817,7 @@ func ListSolicitudesPendientes(c *fiber.Ctx) error {
 		solicitudes = append(solicitudes, models.SolicitudDetalle{
 			ID:             raw.id,
 			Cedula:         cedulaReal,
+			Codigo:         codigo,
 			NombreEmpleado: nombre,
 			Foto:           foto,
 			FechaSolicitud: raw.fechaSolicitud,
@@ -917,9 +942,10 @@ func ListAllSolicitudes(c *fiber.Ctx) error {
 	var solicitudes []models.SolicitudDetalle
 	var desconocidosCount int
 	for _, raw := range rawList {
-		var cedulaReal, nombre, foto string
+		var cedulaReal, nombre, foto, codigo string
 
 		if raw.tipoUsuario == "se_operaciones" {
+			codigo = raw.cedula
 			cedulaReal = codigoACedula[raw.cedula]
 			if cedulaReal == "" {
 				log.Printf("[ListAllSolicitudes] No se encontró cédula para código: %s", raw.cedula)
@@ -941,6 +967,7 @@ func ListAllSolicitudes(c *fiber.Ctx) error {
 		solicitudes = append(solicitudes, models.SolicitudDetalle{
 			ID:             raw.id,
 			Cedula:         cedulaReal,
+			Codigo:         codigo,
 			NombreEmpleado: nombre,
 			Foto:           foto,
 			FechaSolicitud: raw.fechaSolicitud,

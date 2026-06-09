@@ -25,6 +25,7 @@
 
   const skipVideo = $derived($page.url.searchParams.get('video') === 'false');
   const esMantenimiento = $derived($currentUser?.area?.toLowerCase().includes('mantenimiento') ?? false);
+  const tipoAnuncio = $derived(esMantenimiento ? 'mantenimiento' : 'operaciones');
 
   function getBogotaDate(): string {
     const now = new Date();
@@ -52,7 +53,6 @@
 
   const shouldShowVideo = $derived(
     !skipVideo && 
-    !esMantenimiento &&
     typeof window !== 'undefined' && 
     sessionStorage.getItem('showWelcomeVideo') === 'true' &&
     !!anuncioActivo && 
@@ -169,12 +169,12 @@
     authStore.checkAuth();
     dashboardStore.loadStats();
 
-    if (skipVideo || esMantenimiento) {
+    if (skipVideo) {
       sessionStorage.removeItem('showWelcomeVideo');
       return;
     }
 
-    getAnuncioActivo().then((res) => {
+    getAnuncioActivo(tipoAnuncio).then((res) => {
       if (!res.anuncio) return;
       anuncioActivo = res.anuncio;
 

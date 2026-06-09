@@ -8,6 +8,9 @@ export default defineConfig({
 	ssr: {
 		noExternal: ['@hugeicons/svelte']
 	},
+	preview: {
+		allowedHosts: ['solicitud-permisos.sao6.com.co']
+	},
 	test: {
 		expect: { requireAssertions: true },
 		projects: [

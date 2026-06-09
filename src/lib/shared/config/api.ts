@@ -96,6 +96,7 @@ export interface AnuncioDetalle {
   titulo?: string;
   activo: boolean;
   creado_por?: string;
+  tipo?: string;
 }
 
 export interface AnuncioConVistas {
@@ -107,6 +108,7 @@ export interface AnuncioConVistas {
   creado_por?: string;
   fecha_creacion: string;
   total_vistas: number;
+  tipo?: string;
 }
 
 export interface AnuncioResponse {
@@ -122,10 +124,14 @@ export interface AnunciosListResponse {
   anuncios: AnuncioConVistas[];
 }
 
-export async function getAnuncioActivo(): Promise<{ success: boolean; message: string; anuncio: AnuncioDetalle | null }> {
+export async function getAnuncioActivo(tipo?: string): Promise<{ success: boolean; message: string; anuncio: AnuncioDetalle | null }> {
   const token = localStorage.getItem('token');
 
-  const response = await fetch(`${API_BASE_URL}/api/anuncios/activo`, {
+  const url = tipo
+    ? `${API_BASE_URL}/api/anuncios/activo?tipo=${encodeURIComponent(tipo)}`
+    : `${API_BASE_URL}/api/anuncios/activo`;
+
+  const response = await fetch(url, {
     method: 'GET',
     headers: { 'Authorization': `Bearer ${token}` },
   });
@@ -144,13 +150,13 @@ export async function listarAnuncios(): Promise<AnunciosListResponse> {
   return response.json();
 }
 
-export async function crearAnuncio(url: string, titulo?: string): Promise<AnuncioResponse> {
+export async function crearAnuncio(url: string, titulo?: string, tipo?: string): Promise<AnuncioResponse> {
   const token = localStorage.getItem('token');
 
   const response = await fetch(`${API_BASE_URL}/api/anuncios/crear`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ url, titulo }),
+    body: JSON.stringify({ url, titulo, tipo }),
   });
 
   return response.json();

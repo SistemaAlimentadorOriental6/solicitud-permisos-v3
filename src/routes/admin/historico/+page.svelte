@@ -90,11 +90,11 @@
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(s => 
+      result = result.filter(s =>
         s.nombre_empleado.toLowerCase().includes(query) ||
         s.cedula.includes(query) ||
         s.tipo_novedad.toLowerCase().includes(query) ||
-        s.id.toString().includes(query)
+        (s.codigo && s.codigo.toLowerCase().includes(query))
       );
     }
 
@@ -371,7 +371,7 @@
           <input 
             type="text" 
             bind:value={searchQuery}
-            placeholder="Buscar por nombre, cédula, tipo o ID..."
+            placeholder="Buscar por nombre, cédula, tipo o código..."
             class="w-full pl-10 pr-4 py-2.5 bg-fondo-soft border-2 border-transparent rounded-xl text-xs font-medium text-texto-dark placeholder:text-texto-grey focus:bg-white focus:border-primario focus:shadow-lg focus:shadow-primario/10 focus:-translate-y-0.5 transition-all duration-200 outline-none"
           />
           <HugeiconsIcon icon={Search01Icon} size={16} class="absolute left-3 top-1/2 -translate-y-1/2 text-texto-grey" />
@@ -522,7 +522,7 @@
                           <span class="text-texto-grey">•</span>
                           <div class="flex items-center gap-1.5 text-xs text-texto-grey">
                             <HugeiconsIcon icon={File01Icon} size={12} />
-                            <span class="font-semibold">ID: {solicitud.id}</span>
+                            <span class="font-semibold">Código: {solicitud.codigo || '—'}</span>
                           </div>
                         </div>
                       </div>

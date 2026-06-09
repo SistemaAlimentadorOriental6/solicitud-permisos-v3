@@ -294,9 +294,10 @@ func GetSolicitudesRecientes(c *fiber.Ctx) error {
 
 	var solicitudes []models.SolicitudDetalle
 	for _, raw := range rawList {
-		var cedulaReal, nombre, foto string
+		var cedulaReal, nombre, foto, codigo string
 
 		if raw.tipoUsuario == "se_operaciones" {
+			codigo = raw.cedula
 			cedulaReal = codigoACedula[raw.cedula]
 		} else {
 			cedulaReal = raw.cedula
@@ -316,6 +317,7 @@ func GetSolicitudesRecientes(c *fiber.Ctx) error {
 		solicitudes = append(solicitudes, models.SolicitudDetalle{
 			ID:             raw.id,
 			Cedula:         cedulaReal,
+			Codigo:         codigo,
 			NombreEmpleado: nombre,
 			Foto:           foto,
 			FechaSolicitud: raw.fechaSolicitud,

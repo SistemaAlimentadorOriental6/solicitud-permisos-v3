@@ -7,6 +7,7 @@
 
   let videoUrl = $state('');
   let videoId = $state('');
+  let videoTipo = $state<'operaciones' | 'mantenimiento'>('operaciones');
   let showPreview = $state(false);
   let anuncios = $state<AnuncioConVistas[]>([]);
   let loading = $state(false);
@@ -45,6 +46,7 @@
   function clearVideo() {
     videoUrl = '';
     videoId = '';
+    videoTipo = 'operaciones';
     showPreview = false;
   }
 
@@ -55,7 +57,7 @@
     }
 
     saving = true;
-    const res = await crearAnuncio(videoUrl, '');
+    const res = await crearAnuncio(videoUrl, '', videoTipo);
     saving = false;
 
     if (res.success) {
@@ -161,43 +163,64 @@
             <label for="video-url" class="block text-xs font-bold text-texto-dark uppercase tracking-wider mb-2">
               URL del Video
             </label>
-            <div class="flex gap-3">
-              <input
-                id="video-url"
-                type="text"
-                bind:value={videoUrl}
-                placeholder="https://www.youtube.com/shorts/e7d0olqQFwI"
-                class="flex-1 px-4 py-3 bg-fondo-soft border border-fondo-soft rounded-xl text-sm text-texto-dark placeholder:text-texto-grey/50 focus:outline-none focus:ring-2 focus:ring-primario/20 focus:border-primario transition-all duration-200"
-              />
-              <button
-                onclick={handleLoadVideo}
-                class="px-6 py-3 bg-fondo-soft text-texto-dark rounded-xl text-sm font-bold hover:bg-fondo-soft/80 transition-all duration-200 flex items-center gap-2"
-              >
-                <HugeiconsIcon icon={Video01Icon} size={18} />
-                Preview
-              </button>
-              {#if showPreview}
+              <div class="flex gap-3">
+                <input
+                  id="video-url"
+                  type="text"
+                  bind:value={videoUrl}
+                  placeholder="https://www.youtube.com/shorts/e7d0olqQFwI"
+                  class="flex-1 px-4 py-3 bg-fondo-soft border border-fondo-soft rounded-xl text-sm text-texto-dark placeholder:text-texto-grey/50 focus:outline-none focus:ring-2 focus:ring-primario/20 focus:border-primario transition-all duration-200"
+                />
                 <button
-                  onclick={handleSaveVideo}
-                  disabled={saving}
-                  class="px-6 py-3 bg-primario text-white rounded-xl text-sm font-bold hover:bg-primario/90 hover:shadow-lg hover:shadow-primario/30 hover:-translate-y-0.5 active:scale-95 transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onclick={handleLoadVideo}
+                  class="px-6 py-3 bg-fondo-soft text-texto-dark rounded-xl text-sm font-bold hover:bg-fondo-soft/80 transition-all duration-200 flex items-center gap-2"
                 >
-                  {saving ? 'Guardando...' : 'Guardar'}
+                  <HugeiconsIcon icon={Video01Icon} size={18} />
+                  Preview
                 </button>
-                <button
-                  onclick={clearVideo}
-                  class="px-6 py-3 bg-fondo-soft text-texto-grey rounded-xl text-sm font-bold hover:bg-texto-grey/10 hover:-translate-y-0.5 active:scale-95 transition-all duration-200"
-                >
-                  Limpiar
-                </button>
-              {/if}
+                {#if showPreview}
+                  <button
+                    onclick={handleSaveVideo}
+                    disabled={saving}
+                    class="px-6 py-3 bg-primario text-white rounded-xl text-sm font-bold hover:bg-primario/90 hover:shadow-lg hover:shadow-primario/30 hover:-translate-y-0.5 active:scale-95 transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {saving ? 'Guardando...' : 'Guardar'}
+                  </button>
+                  <button
+                    onclick={clearVideo}
+                    class="px-6 py-3 bg-fondo-soft text-texto-grey rounded-xl text-sm font-bold hover:bg-texto-grey/10 hover:-translate-y-0.5 active:scale-95 transition-all duration-200"
+                  >
+                    Limpiar
+                  </button>
+                {/if}
+              </div>
+              <p class="text-xs text-texto-grey mt-2">
+                Soporta URLs de YouTube Shorts, videos normales y enlaces cortos (youtu.be)
+              </p>
             </div>
-            <p class="text-xs text-texto-grey mt-2">
-              Soporta URLs de YouTube Shorts, videos normales y enlaces cortos (youtu.be)
-            </p>
+
+            <!-- Selector de tipo -->
+            <div>
+              <label class="block text-xs font-bold text-texto-dark uppercase tracking-wider mb-2">
+                Tipo de Anuncio
+              </label>
+              <div class="flex gap-3">
+                <button
+                  onclick={() => videoTipo = 'operaciones'}
+                  class="flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 border-2 {videoTipo === 'operaciones' ? 'bg-primario/10 border-primario text-primario' : 'bg-fondo-soft border-transparent text-texto-grey hover:border-primario/30'}"
+                >
+                  Operaciones
+                </button>
+                <button
+                  onclick={() => videoTipo = 'mantenimiento'}
+                  class="flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-all duration-200 border-2 {videoTipo === 'mantenimiento' ? 'bg-amber-50 border-amber-500 text-amber-600' : 'bg-fondo-soft border-transparent text-texto-grey hover:border-amber-500/30'}"
+                >
+                  Mantenimiento
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
       <!-- Preview del video -->
       {#if showPreview && videoId}
@@ -263,56 +286,135 @@
             <p class="text-sm text-texto-grey">Carga un video para comenzar</p>
           </div>
         {:else}
-          <div class="space-y-4">
-            {#each anuncios as anuncio (anuncio.id)}
-              <div class="flex items-center gap-4 p-4 bg-fondo-soft rounded-xl {anuncio.activo ? 'ring-2 ring-primario/30' : ''}">
-                <!-- Thumbnail -->
-                <div class="w-24 h-16 bg-black rounded-lg overflow-hidden flex-shrink-0">
-                  <img
-                    src="https://img.youtube.com/vi/{anuncio.video_id}/mqdefault.jpg"
-                    alt="Thumbnail"
-                    class="w-full h-full object-cover"
-                  />
-                </div>
+          {@const anunciosOperaciones = anuncios.filter(a => a.tipo === 'operaciones' || !a.tipo)}
+          {@const anunciosMantenimiento = anuncios.filter(a => a.tipo === 'mantenimiento')}
 
-                <!-- Info -->
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 mb-1">
-                    <p class="text-sm font-bold text-texto-dark truncate">{anuncio.video_id}</p>
-                    {#if anuncio.activo}
-                      <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">ACTIVO</span>
-                    {:else}
-                      <span class="px-2 py-0.5 bg-texto-grey/10 text-texto-grey text-xs font-bold rounded-full">INACTIVO</span>
-                    {/if}
-                  </div>
-                  <div class="flex items-center gap-4 text-xs text-texto-grey">
-                    <span class="flex items-center gap-1">
-                      <HugeiconsIcon icon={EyeIcon} size={14} />
-                      {anuncio.total_vistas} {anuncio.total_vistas === 1 ? 'vista' : 'vistas'}
-                    </span>
-                    <span>{anuncio.fecha_creacion}</span>
-                  </div>
+          <div class="space-y-8">
+            <!-- Operaciones -->
+            {#if anunciosOperaciones.length > 0}
+              <div>
+                <div class="flex items-center gap-2 mb-4">
+                  <div class="w-2 h-2 rounded-full bg-primario"></div>
+                  <h3 class="text-sm font-bold text-texto-dark uppercase tracking-wider">Operaciones</h3>
+                  <span class="px-2 py-0.5 bg-primario/10 text-primario text-xs font-bold rounded-full">{anunciosOperaciones.length}</span>
                 </div>
+                <div class="space-y-3">
+                  {#each anunciosOperaciones as anuncio (anuncio.id)}
+                    <div class="flex items-center gap-4 p-4 bg-fondo-soft rounded-xl {anuncio.activo ? 'ring-2 ring-primario/30' : ''}">
+                      <!-- Thumbnail -->
+                      <div class="w-24 h-16 bg-black rounded-lg overflow-hidden flex-shrink-0">
+                        <img
+                          src="https://img.youtube.com/vi/{anuncio.video_id}/mqdefault.jpg"
+                          alt="Thumbnail"
+                          class="w-full h-full object-cover"
+                        />
+                      </div>
 
-                <!-- Actions -->
-                <div class="flex items-center gap-2 flex-shrink-0">
-                  <button
-                    onclick={() => handleToggleActivo(anuncio)}
-                    class="p-2 rounded-lg hover:bg-white transition-colors"
-                    title={anuncio.activo ? 'Desactivar' : 'Activar'}
-                  >
-                    <HugeiconsIcon icon={ToggleOnIcon} size={20} class={anuncio.activo ? 'text-green-500' : 'text-texto-grey'} />
-                  </button>
-                  <button
-                    onclick={() => handleEliminar(anuncio.id)}
-                    class="p-2 rounded-lg hover:bg-red-50 transition-colors"
-                    title="Eliminar"
-                  >
-                    <HugeiconsIcon icon={Delete01Icon} size={20} class="text-red-500" />
-                  </button>
+                      <!-- Info -->
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                          <p class="text-sm font-bold text-texto-dark truncate">{anuncio.video_id}</p>
+                          <span class="px-2 py-0.5 bg-primario/10 text-primario text-[10px] font-bold rounded-full uppercase">Operaciones</span>
+                          {#if anuncio.activo}
+                            <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">ACTIVO</span>
+                          {:else}
+                            <span class="px-2 py-0.5 bg-texto-grey/10 text-texto-grey text-xs font-bold rounded-full">INACTIVO</span>
+                          {/if}
+                        </div>
+                        <div class="flex items-center gap-4 text-xs text-texto-grey">
+                          <span class="flex items-center gap-1">
+                            <HugeiconsIcon icon={EyeIcon} size={14} />
+                            {anuncio.total_vistas} {anuncio.total_vistas === 1 ? 'vista' : 'vistas'}
+                          </span>
+                          <span>{anuncio.fecha_creacion}</span>
+                        </div>
+                      </div>
+
+                      <!-- Actions -->
+                      <div class="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onclick={() => handleToggleActivo(anuncio)}
+                          class="p-2 rounded-lg hover:bg-white transition-colors"
+                          title={anuncio.activo ? 'Desactivar' : 'Activar'}
+                        >
+                          <HugeiconsIcon icon={ToggleOnIcon} size={20} class={anuncio.activo ? 'text-green-500' : 'text-texto-grey'} />
+                        </button>
+                        <button
+                          onclick={() => handleEliminar(anuncio.id)}
+                          class="p-2 rounded-lg hover:bg-red-50 transition-colors"
+                          title="Eliminar"
+                        >
+                          <HugeiconsIcon icon={Delete01Icon} size={20} class="text-red-500" />
+                        </button>
+                      </div>
+                    </div>
+                  {/each}
                 </div>
               </div>
-            {/each}
+            {/if}
+
+            <!-- Mantenimiento -->
+            {#if anunciosMantenimiento.length > 0}
+              <div>
+                <div class="flex items-center gap-2 mb-4">
+                  <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+                  <h3 class="text-sm font-bold text-texto-dark uppercase tracking-wider">Mantenimiento</h3>
+                  <span class="px-2 py-0.5 bg-amber-50 text-amber-600 text-xs font-bold rounded-full">{anunciosMantenimiento.length}</span>
+                </div>
+                <div class="space-y-3">
+                  {#each anunciosMantenimiento as anuncio (anuncio.id)}
+                    <div class="flex items-center gap-4 p-4 bg-fondo-soft rounded-xl {anuncio.activo ? 'ring-2 ring-amber-500/30' : ''}">
+                      <!-- Thumbnail -->
+                      <div class="w-24 h-16 bg-black rounded-lg overflow-hidden flex-shrink-0">
+                        <img
+                          src="https://img.youtube.com/vi/{anuncio.video_id}/mqdefault.jpg"
+                          alt="Thumbnail"
+                          class="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      <!-- Info -->
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                          <p class="text-sm font-bold text-texto-dark truncate">{anuncio.video_id}</p>
+                          <span class="px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] font-bold rounded-full uppercase">Mantenimiento</span>
+                          {#if anuncio.activo}
+                            <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">ACTIVO</span>
+                          {:else}
+                            <span class="px-2 py-0.5 bg-texto-grey/10 text-texto-grey text-xs font-bold rounded-full">INACTIVO</span>
+                          {/if}
+                        </div>
+                        <div class="flex items-center gap-4 text-xs text-texto-grey">
+                          <span class="flex items-center gap-1">
+                            <HugeiconsIcon icon={EyeIcon} size={14} />
+                            {anuncio.total_vistas} {anuncio.total_vistas === 1 ? 'vista' : 'vistas'}
+                          </span>
+                          <span>{anuncio.fecha_creacion}</span>
+                        </div>
+                      </div>
+
+                      <!-- Actions -->
+                      <div class="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onclick={() => handleToggleActivo(anuncio)}
+                          class="p-2 rounded-lg hover:bg-white transition-colors"
+                          title={anuncio.activo ? 'Desactivar' : 'Activar'}
+                        >
+                          <HugeiconsIcon icon={ToggleOnIcon} size={20} class={anuncio.activo ? 'text-green-500' : 'text-texto-grey'} />
+                        </button>
+                        <button
+                          onclick={() => handleEliminar(anuncio.id)}
+                          class="p-2 rounded-lg hover:bg-red-50 transition-colors"
+                          title="Eliminar"
+                        >
+                          <HugeiconsIcon icon={Delete01Icon} size={20} class="text-red-500" />
+                        </button>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
           </div>
         {/if}
       </div>
