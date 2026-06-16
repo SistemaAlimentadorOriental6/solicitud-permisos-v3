@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -27,7 +27,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: "1.24"
 
       - name: Install Frontend Dependencies
         run: pnpm install
@@ -113,7 +113,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: "1.24"
 
       - name: Instalar dependencias Frontend
         working-directory: /var/www/operaciones/solicitud-permisos-v3
@@ -127,13 +127,19 @@ jobs:
 
       - name: Build Backend (Go)
         working-directory: /var/www/operaciones/solicitud-permisos-v3/backend
-        run: go build -o ../bin/backend ./cmd/main.go
+        run: |
+          mkdir -p ../bin
+          go build -o ../bin/backend ./cmd/main.go
+          ls -lah ../bin
+          file ../bin/backend
 
       - name: Reiniciar con PM2 (Backend)
         working-directory: /var/www/operaciones/solicitud-permisos-v3
         run: |
           pm2 delete solicitud_permisos_back || true
-          pm2 start bin --name "solicitud_permisos_back"
+          pm2 start ./bin/backend \
+            --interpreter none \
+            --name "solicitud_permisos_back"
           pm2 save
 
       - name: Reiniciar con PM2 (Frontend - puerto 3047)

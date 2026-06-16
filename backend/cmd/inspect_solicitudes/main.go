@@ -43,7 +43,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, descripcion, fecha_creacion, estado, respuesta_admin, tipo_usuario
+	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, COALESCE(descripcion, ''), fecha_creacion, estado, respuesta_admin, tipo_usuario
 	          FROM solicitudes_permisos
 	          WHERE estado = 'Pendiente' ORDER BY fecha_creacion DESC`
 

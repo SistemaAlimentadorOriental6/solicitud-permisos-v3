@@ -9,7 +9,7 @@
     dashboardLoading,
   } from "$lib/domains/dashboard";
   import StatsGrid from "$lib/domains/dashboard/components/StatsGrid.svelte";
-  import { getAnuncioActivo, registrarVista } from "$lib/shared/config/api";
+  import { getAnuncioActivo, registrarVista, getUltimaVista } from "$lib/shared/config/api";
   import type { AnuncioDetalle } from "$lib/shared/config/api";
 
   let currentDate = $state("");
@@ -174,12 +174,27 @@
       return;
     }
 
-    getAnuncioActivo(tipoAnuncio).then((res) => {
+    getAnuncioActivo(tipoAnuncio).then(async (res) => {
       if (!res.anuncio) return;
       anuncioActivo = res.anuncio;
 
       if (hasVideoBeenWatchedToday(res.anuncio.id)) return;
       if (sessionStorage.getItem('showWelcomeVideo') !== 'true') return;
+
+      const today = getBogotaDate();
+      try {
+        const vistaRes = await getUltimaVista(res.anuncio.id);
+        if (vistaRes.success && vistaRes.ultima_vista) {
+          const ultimaVistaDate = String(vistaRes.ultima_vista).substring(0, 10);
+          if (ultimaVistaDate === today) {
+            markVideoAsWatched(res.anuncio.id);
+            sessionStorage.removeItem('showWelcomeVideo');
+            return;
+          }
+        }
+      } catch (e) {
+        // Si falla la consulta, permitir mostrar el video (fallback)
+      }
 
       showVideoModal = true;
 

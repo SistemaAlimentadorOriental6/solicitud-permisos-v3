@@ -455,7 +455,7 @@ func ListSolicitudes(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, descripcion, fecha_creacion, estado, respuesta_admin
+	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, COALESCE(descripcion, ''), fecha_creacion, estado, respuesta_admin
 	          FROM solicitudes_permisos
 	          WHERE cedula = ? OR cedula = ? OR cedula_real = ?
 	          ORDER BY fecha_creacion DESC`
@@ -529,7 +529,7 @@ func GetHistorialByCedula(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, descripcion, fecha_creacion, estado, respuesta_admin
+	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, COALESCE(descripcion, ''), fecha_creacion, estado, respuesta_admin
 	          FROM solicitudes_permisos
 	          WHERE cedula = ? OR cedula_real = ?
 	          ORDER BY fecha_creacion DESC`
@@ -720,7 +720,7 @@ func ListSolicitudesPendientes(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, descripcion, fecha_creacion, estado, respuesta_admin, tipo_usuario
+	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, COALESCE(descripcion, ''), fecha_creacion, estado, respuesta_admin, tipo_usuario
 	          FROM solicitudes_permisos
 	          WHERE estado = 'Pendiente'`
 
@@ -847,7 +847,7 @@ func ListAllSolicitudes(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, descripcion, fecha_creacion, estado, respuesta_admin, tipo_usuario
+	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, COALESCE(descripcion, ''), fecha_creacion, estado, respuesta_admin, tipo_usuario
 	          FROM solicitudes_permisos
 	          WHERE 1=1`
 

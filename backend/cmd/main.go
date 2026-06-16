@@ -88,6 +88,7 @@ func main() {
 	app.Put("/api/anuncios/:id", handlers.ActualizarAnuncio)
 	app.Delete("/api/anuncios/:id", handlers.EliminarAnuncio)
 	app.Post("/api/anuncios/:id/vista", handlers.RegistrarVista)
+	app.Get("/api/anuncios/:id/vista/ultima", handlers.GetUltimaVista)
 	app.Get("/api/anuncios/:id/vistas", handlers.GetEstadisticasVistas)
 
 	app.Get("/api/fechas-solicitudes", handlers.GetFechasSolicitudes)

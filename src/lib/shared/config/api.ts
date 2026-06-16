@@ -200,6 +200,17 @@ export async function registrarVista(id: number): Promise<{ success: boolean; me
   return response.json();
 }
 
+export async function getUltimaVista(id: number): Promise<{ success: boolean; message: string; ultima_vista?: string }> {
+  const token = localStorage.getItem('token');
+
+  const response = await fetch(`${API_BASE_URL}/api/anuncios/${id}/vista/ultima`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+
+  return response.json();
+}
+
 export interface FechaSolicitud {
   id: number;
   fecha: string;

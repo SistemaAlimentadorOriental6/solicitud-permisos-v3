@@ -209,7 +209,7 @@ func GetSolicitudesRecientes(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, descripcion, fecha_creacion, estado, respuesta_admin, tipo_usuario, fecha_gestion, usuario_gestion
+	query := `SELECT id, cedula, fecha_solicitud, hora_solicitud, tipo_novedad, COALESCE(descripcion, ''), fecha_creacion, estado, respuesta_admin, tipo_usuario, fecha_gestion, usuario_gestion
 	          FROM solicitudes_permisos
 	          WHERE estado != 'Pendiente' AND fecha_gestion IS NOT NULL AND fecha_gestion >= NOW() - INTERVAL 1 HOUR`
 

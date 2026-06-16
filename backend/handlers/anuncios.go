@@ -391,11 +391,11 @@ func RegistrarVista(c *fiber.Ctx) error {
 	}
 
 	_, err = mysqlDB.ExecContext(ctx,
-		"INSERT INTO anuncios_vistas (anuncio_id, cedula) VALUES (?, ?)",
+		"INSERT INTO anuncios_vistas (anuncio_id, cedula, fecha_vista) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE fecha_vista = NOW()",
 		id, claims.Cedula,
 	)
 	if err != nil {
-		log.Printf("Error insertando vista: %v", err)
+		log.Printf("Error insertando/actualizando vista: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"success": false,
 			"message": "Error al registrar vista",
@@ -412,6 +412,42 @@ func RegistrarVista(c *fiber.Ctx) error {
 		"success":      true,
 		"message":      "Vista registrada",
 		"total_vistas": totalVistas,
+	})
+}
+
+func GetUltimaVista(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"message": "ID requerido",
+		})
+	}
+
+	claims := c.Locals("user").(*utils.Claims)
+
+	mysqlDB := db.GetSolicitudPermisosDB()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var ultimaVista sql.NullString
+	err := mysqlDB.QueryRowContext(ctx,
+		"SELECT DATE(fecha_vista) FROM anuncios_vistas WHERE anuncio_id = ? AND cedula = ? ORDER BY fecha_vista DESC LIMIT 1",
+		id, claims.Cedula,
+	).Scan(&ultimaVista)
+
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("Error consultando ultima vista: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"message": "Error al consultar ultima vista",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success":       true,
+		"message":       "OK",
+		"ultima_vista":  ultimaVista.String,
 	})
 }
 
