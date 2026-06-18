@@ -292,17 +292,27 @@ export interface TipoCantidad {
   cantidad: number;
 }
 
+export interface AreaStats {
+  total: number;
+  aprobadas: number;
+  rechazadas: number;
+  pendientes: number;
+}
+
 export interface DiaSolicitudInfo {
   fecha: string;
   dia_semana: string;
   dia_numero: number;
   total: number;
   tipos: TipoCantidad[];
+  operaciones: AreaStats;
+  mantenimiento: AreaStats;
 }
 
 export interface SemanaInfo {
   label: string;
   dates: string;
+  inicio: string;
 }
 
 export interface SemanaSolicitudResponse {

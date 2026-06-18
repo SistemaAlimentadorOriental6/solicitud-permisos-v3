@@ -304,6 +304,8 @@
   }
 
   async function handleSubmit() {
+    if (isSubmitting) return;
+
     if (!tipoNovedad) {
       toast.error("Selecciona el tipo de novedad");
       return;

@@ -284,16 +284,26 @@ type SemanaSolicitudResponse struct {
 }
 
 type SemanaInfo struct {
-	Label string `json:"label"`
-	Dates string `json:"dates"`
+	Label  string `json:"label"`
+	Dates  string `json:"dates"`
+	Inicio string `json:"inicio"`
+}
+
+type AreaStats struct {
+	Total      int `json:"total"`
+	Aprobadas  int `json:"aprobadas"`
+	Rechazadas int `json:"rechazadas"`
+	Pendientes int `json:"pendientes"`
 }
 
 type DiaSolicitudInfo struct {
-	Fecha     string         `json:"fecha"`
-	DiaSemana string         `json:"dia_semana"`
-	DiaNumero int            `json:"dia_numero"`
-	Total     int            `json:"total"`
-	Tipos     []TipoCantidad `json:"tipos"`
+	Fecha         string         `json:"fecha"`
+	DiaSemana     string         `json:"dia_semana"`
+	DiaNumero     int            `json:"dia_numero"`
+	Total         int            `json:"total"`
+	Tipos         []TipoCantidad `json:"tipos"`
+	Operaciones   AreaStats      `json:"operaciones"`
+	Mantenimiento AreaStats      `json:"mantenimiento"`
 }
 
 type TipoCantidad struct {

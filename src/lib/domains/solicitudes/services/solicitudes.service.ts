@@ -186,3 +186,27 @@ export async function getSolicitudesRecientes(area?: 'operaciones' | 'mantenimie
 
   return data;
 }
+
+export interface EliminarSolicitudResponse {
+  success: boolean;
+  message: string;
+}
+
+export async function eliminarSolicitud(id: number): Promise<EliminarSolicitudResponse> {
+  const token = localStorage.getItem('token');
+
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Error al eliminar la solicitud');
+  }
+
+  return data;
+}

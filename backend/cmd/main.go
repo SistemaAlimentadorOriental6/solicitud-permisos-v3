@@ -74,6 +74,7 @@ func main() {
 	app.Get("/api/solicitudes/recientes", handlers.GetSolicitudesRecientes)
 	app.Get("/api/solicitudes/historial/:cedula", handlers.GetHistorialByCedula)
 	app.Put("/api/solicitudes/:id/responder", handlers.ResponderSolicitud)
+	app.Delete("/api/solicitudes/:id", handlers.EliminarSolicitud)
 	app.Get("/api/admin/semana-solicitudes", handlers.GetSemanaSolicitudes)
 	app.Get("/api/admin/stats", handlers.GetStatsGeneral)
 	app.Get("/api/permisos/tipos", handlers.GetPermisosTipos)

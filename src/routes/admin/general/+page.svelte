@@ -23,19 +23,20 @@
     solicitudesRecientesStats,
     solicitudesRecientesLoading,
     responderSolicitud,
+    eliminarSolicitud,
   } from "$lib/domains/solicitudes";
   import { currentUser, obtenerAreaForzada } from "$lib/domains/auth";
+  import toast from "svelte-french-toast";
   import SolicitudModal from "$lib/shared/components/SolicitudModal.svelte";
   import {
     getSemanaSolicitudes,
     type DiaSolicitudInfo,
   } from "$lib/shared/config/api";
 
-  let currentWeekOffset = $state(0);
-  let weekInfo = $derived(getWeekDates(currentWeekOffset));
+  let currentMondayStr = $state<string | null>(null);
   let weekData = $state<DiaSolicitudInfo[]>([]);
   let weekDataLoading = $state(false);
-  let semanaInfo = $state<{ label: string; dates: string } | null>(null);
+  let semanaInfo = $state<{ label: string; dates: string; inicio: string } | null>(null);
   let isModalOpen = $state(false);
   let selectedSolicitud = $state(null);
   let isDayModalOpen = $state(false);
@@ -44,7 +45,25 @@
     date: number;
     count: number;
     solicitudes: Array<{ tipo: string; cantidad: number }>;
+    operaciones: { total: number; aprobadas: number; rechazadas: number; pendientes: number };
+    mantenimiento: { total: number; aprobadas: number; rechazadas: number; pendientes: number };
   } | null>(null);
+
+  let imageModalOpen = $state(false);
+  let selectedImage = $state<string | null>(null);
+  let selectedImageAlt = $state<string>("");
+
+  function openImageModal(fotoUrl: string, altText: string) {
+    selectedImage = fotoUrl;
+    selectedImageAlt = altText;
+    imageModalOpen = true;
+  }
+
+  function closeImageModal() {
+    imageModalOpen = false;
+    selectedImage = null;
+    selectedImageAlt = "";
+  }
 
   let chartData = $derived(
     weekData.map((d) => ({
@@ -52,6 +71,8 @@
       date: d.dia_numero,
       count: d.total,
       solicitudes: d.tipos,
+      operaciones: d.operaciones || { total: 0, aprobadas: 0, rechazadas: 0, pendientes: 0 },
+      mantenimiento: d.mantenimiento || { total: 0, aprobadas: 0, rechazadas: 0, pendientes: 0 },
     })),
   );
 
@@ -62,15 +83,16 @@
   let activeTab = $state<"permisos" | "recientes">("permisos");
   let cambiandoEstadoId = $state<number | null>(null);
 
-  async function loadWeekData() {
+  async function loadWeekData(targetDate?: string) {
     weekDataLoading = true;
     try {
-      const monday = getMondayOfWeek(new Date(), currentWeekOffset);
-      const inicio = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
-      const res = await getSemanaSolicitudes(inicio, areaForzada ?? undefined);
+      const res = await getSemanaSolicitudes(targetDate, areaForzada ?? undefined);
       if (res.success) {
         weekData = res.dias;
-        if (res.semana) semanaInfo = res.semana;
+        if (res.semana) {
+          semanaInfo = res.semana;
+          currentMondayStr = res.semana.inicio;
+        }
       }
     } catch {
       weekData = [];
@@ -79,17 +101,9 @@
     }
   }
 
-  function getMondayOfWeek(date: Date, offset: number): Date {
-    const d = new Date(date);
-    const dow = d.getDay();
-    const normalized = dow === 0 ? 7 : dow;
-    d.setDate(d.getDate() + (1 - normalized) + offset * 7);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }
-
   $effect(() => {
-    loadWeekData();
+    const _ = areaForzada;
+    loadWeekData(undefined);
   });
 
   $effect(() => {
@@ -100,50 +114,20 @@
     }
   });
 
-  function getWeekDates(offset: number): { label: string; dates: string } {
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay() + 1 + offset * 7);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-
-    const months = [
-      "ene",
-      "feb",
-      "mar",
-      "abr",
-      "may",
-      "jun",
-      "jul",
-      "ago",
-      "sep",
-      "oct",
-      "nov",
-      "dic",
-    ];
-    const startStr = `${startOfWeek.getDate()} ${months[startOfWeek.getMonth()]}`;
-    const endStr = `${endOfWeek.getDate()} ${months[endOfWeek.getMonth()]}, ${endOfWeek.getFullYear()}`;
-
-    const weekNum = Math.ceil(
-      ((startOfWeek.getTime() -
-        new Date(startOfWeek.getFullYear(), 0, 1).getTime()) /
-        86400000 +
-        1) /
-        7,
-    );
-
-    return {
-      label: `Semana ${weekNum}`,
-      dates: `${startStr} - ${endStr}`,
-    };
-  }
-
   function prevWeek() {
-    currentWeekOffset--;
+    if (!currentMondayStr) return;
+    const d = new Date(currentMondayStr + "T12:00:00");
+    d.setDate(d.getDate() - 7);
+    const nextDate = d.toISOString().split("T")[0];
+    loadWeekData(nextDate);
   }
 
   function nextWeek() {
-    currentWeekOffset++;
+    if (!currentMondayStr) return;
+    const d = new Date(currentMondayStr + "T12:00:00");
+    d.setDate(d.getDate() + 7);
+    const nextDate = d.toISOString().split("T")[0];
+    loadWeekData(nextDate);
   }
 
   function refresh() {
@@ -272,9 +256,60 @@
     return `${formatOne(first)}, ${first.y} - ${formatOne(last)}, ${last.y}`;
   }
 
+  let searchQuery = $state("");
+  let selectedTipos = $state<string[]>([]);
+  let filterMenuOpen = $state(false);
+
+  function toggleFilterMenu() {
+    filterMenuOpen = !filterMenuOpen;
+  }
+
+  let todosTiposNovedad = $derived.by(() => {
+    const tipos = new Set<string>();
+    for (const sol of $solicitudesPendientes) {
+      if (sol.tipo_novedad) tipos.add(sol.tipo_novedad);
+    }
+    for (const sol of $solicitudesRecientes) {
+      if (sol.tipo_novedad) tipos.add(sol.tipo_novedad);
+    }
+    return Array.from(tipos).sort();
+  });
+
+  let solicitudesPendientesFiltradas = $derived.by(() => {
+    return $solicitudesPendientes.filter((sol) => {
+      const term = searchQuery.toLowerCase().trim();
+      const cumpleBusqueda =
+        !term ||
+        (sol.nombre_empleado || "").toLowerCase().includes(term) ||
+        (sol.codigo || "").toLowerCase().includes(term) ||
+        (sol.cedula || "").toLowerCase().includes(term);
+
+      const cumpleTipo =
+        selectedTipos.length === 0 || selectedTipos.includes(sol.tipo_novedad);
+
+      return cumpleBusqueda && cumpleTipo;
+    });
+  });
+
+  let solicitudesRecientesFiltradas = $derived.by(() => {
+    return $solicitudesRecientes.filter((sol) => {
+      const term = searchQuery.toLowerCase().trim();
+      const cumpleBusqueda =
+        !term ||
+        (sol.nombre_empleado || "").toLowerCase().includes(term) ||
+        (sol.codigo || "").toLowerCase().includes(term) ||
+        (sol.cedula || "").toLowerCase().includes(term);
+
+      const cumpleTipo =
+        selectedTipos.length === 0 || selectedTipos.includes(sol.tipo_novedad);
+
+      return cumpleBusqueda && cumpleTipo;
+    });
+  });
+
   let groupedSolicitudesArray = $derived.by(() => {
     const groups: Record<string, any[]> = {};
-    for (const sol of $solicitudesPendientes) {
+    for (const sol of solicitudesPendientesFiltradas) {
       const key = sol.cedula;
       if (!groups[key]) {
         groups[key] = [];
@@ -297,6 +332,56 @@
     transitionDirection[cedula] = -1;
     const current = currentIndices[cedula] || 0;
     currentIndices[cedula] = (current - 1 + max) % max;
+  }
+
+  let contextMenuOpen = $state(false);
+  let contextMenuX = $state(0);
+  let contextMenuY = $state(0);
+  let contextMenuSolicitudId = $state<number | null>(null);
+
+  function handleContextMenu(event: MouseEvent, id: number) {
+    event.preventDefault();
+    contextMenuX = event.clientX;
+    contextMenuY = event.clientY;
+    contextMenuSolicitudId = id;
+    contextMenuOpen = true;
+  }
+
+  function closeContextMenu() {
+    contextMenuOpen = false;
+    contextMenuSolicitudId = null;
+  }
+
+  let deleteConfirmModalOpen = $state(false);
+  let deleteConfirmSolicitudId = $state<number | null>(null);
+
+  function showDeleteConfirmation() {
+    if (!contextMenuSolicitudId) return;
+    deleteConfirmSolicitudId = contextMenuSolicitudId;
+    closeContextMenu();
+    deleteConfirmModalOpen = true;
+  }
+
+  async function executeEliminarSolicitud() {
+    if (!deleteConfirmSolicitudId) return;
+    const id = deleteConfirmSolicitudId;
+    deleteConfirmModalOpen = false;
+    deleteConfirmSolicitudId = null;
+
+    try {
+      const res = await eliminarSolicitud(id);
+      if (res.success) {
+        toast.success(res.message || "Solicitud eliminada exitosamente");
+        refresh();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error al eliminar la solicitud");
+    }
+  }
+
+  function closeDeleteConfirmation() {
+    deleteConfirmModalOpen = false;
+    deleteConfirmSolicitudId = null;
   }
 
   onMount(() => {
@@ -552,21 +637,6 @@
   <div
     class="bg-white rounded-2xl border border-fondo-soft overflow-hidden shadow-sm relative"
   >
-    <!-- Cinta de Mantenimiento estilo Policía -->
-    <div
-      class="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-20 overflow-hidden rounded-2xl"
-    >
-      <div
-        class="absolute w-[180%] py-3 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 border-y-4 border-texto-dark text-texto-dark font-display font-black text-[10px] sm:text-xs uppercase tracking-[0.25em] text-center shadow-xl rotate-[-6deg] flex items-center justify-around whitespace-nowrap select-none"
-      >
-        <span> MANTENIMIENTO </span>
-        <span> MANTENIMIENTO </span>
-        <span> MANTENIMIENTO </span>
-        <span> MANTENIMIENTO </span>
-        <span> MANTENIMIENTO </span>
-      </div>
-    </div>
-
     <div
       class="flex items-center justify-between px-6 py-4 border-b border-fondo-soft"
     >
@@ -584,10 +654,10 @@
         <p
           class="font-display text-sm font-bold text-texto-dark uppercase tracking-wider"
         >
-          MANTENIMIENTO: {semanaInfo?.label ?? weekInfo.label}
+          Calendario Semanal: {semanaInfo?.label ?? ''}
         </p>
         <p class="text-xs text-texto-grey mt-0.5">
-          {semanaInfo?.dates ?? weekInfo.dates}
+          {semanaInfo?.dates ?? ''}
         </p>
       </div>
       <button
@@ -613,7 +683,7 @@
           >
         </div>
       {:else}
-        <div class="grid grid-cols-7 gap-4 items-end">
+        <div class="grid gap-4 items-end" style="grid-template-columns: repeat({chartData.length || 7}, minmax(0, 1fr));">
           {#each chartData as dayInfo}
             <button
               onclick={() => openDayModal(dayInfo)}
@@ -646,6 +716,31 @@
                 <p class="text-xs font-semibold text-texto-dark">
                   {dayInfo.date}
                 </p>
+              </div>
+
+              <!-- Mini Resumen por Estado (Limpio y Nativo) -->
+              <div class="mt-2.5 flex items-center justify-center gap-1 w-full flex-wrap">
+                {#if dayInfo.count > 0}
+                  {@const aprobadas = (dayInfo.operaciones.aprobadas || 0) + (dayInfo.mantenimiento.aprobadas || 0)}
+                  {@const rechazadas = (dayInfo.operaciones.rechazadas || 0) + (dayInfo.mantenimiento.rechazadas || 0)}
+                  {@const pendientes = (dayInfo.operaciones.pendientes || 0) + (dayInfo.mantenimiento.pendientes || 0)}
+
+                  {#if aprobadas > 0}
+                    <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 text-[9px] font-extrabold border border-emerald-100/40" title="Aprobadas">
+                      ✓ {aprobadas}
+                    </span>
+                  {/if}
+                  {#if rechazadas > 0}
+                    <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-red-50 text-red-600 text-[9px] font-extrabold border border-red-100/40" title="Rechazadas">
+                      ✗ {rechazadas}
+                    </span>
+                  {/if}
+                  {#if pendientes > 0}
+                    <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-600 text-[9px] font-extrabold border border-amber-100/40" title="Pendientes">
+                      ◷ {pendientes}
+                    </span>
+                  {/if}
+                {/if}
               </div>
             </button>
           {/each}
@@ -689,6 +784,7 @@
             <input
               type="text"
               placeholder="Buscar por código, nombre..."
+              bind:value={searchQuery}
               class="w-80 pl-10 pr-4 py-2.5 bg-fondo-soft border-2 border-transparent rounded-xl text-xs font-medium text-texto-dark placeholder:text-texto-grey focus:bg-white focus:border-primario focus:shadow-lg focus:shadow-primario/10 focus:-translate-y-0.5 transition-all duration-200 outline-none"
             />
             <svg
@@ -705,24 +801,82 @@
               />
             </svg>
           </div>
-          <button
-            class="flex items-center gap-2 px-4 py-2.5 bg-fondo-soft rounded-xl text-xs font-bold text-texto-grey hover:bg-primario/10 hover:text-primario hover:-translate-y-0.5 active:scale-95 transition-all duration-200"
-          >
-            <svg
-              class="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div class="relative">
+            <button
+              onclick={toggleFilterMenu}
+              class="flex items-center gap-2 px-4 py-2.5 bg-fondo-soft rounded-xl text-xs font-bold text-texto-grey hover:bg-primario/10 hover:text-primario hover:-translate-y-0.5 active:scale-95 transition-all duration-200 {selectedTipos.length > 0 ? 'text-primario bg-primario/10' : ''}"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-              />
-            </svg>
-            FILTROS
-          </button>
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+              FILTROS {#if selectedTipos.length > 0}({selectedTipos.length}){/if}
+            </button>
+
+            {#if filterMenuOpen}
+              <!-- Backdrop para cerrar al hacer clic afuera -->
+              <div
+                class="fixed inset-0 z-30"
+                onclick={() => filterMenuOpen = false}
+                onkeydown={(e) => e.key === "Escape" && (filterMenuOpen = false)}
+                role="button"
+                tabindex="-1"
+                aria-label="Cerrar menú de filtros"
+              ></div>
+              
+              <div
+                class="absolute right-0 mt-2 w-64 bg-white border border-fondo-soft rounded-2xl shadow-xl z-40 p-4 space-y-3"
+                onclick={(e) => e.stopPropagation()}
+                onkeydown={(e) => e.stopPropagation()}
+                role="dialog"
+              >
+                <div class="flex items-center justify-between border-b border-fondo-soft pb-2">
+                  <span class="text-xs font-extrabold text-texto-dark">Tipos de Novedad</span>
+                  {#if selectedTipos.length > 0}
+                    <button
+                      onclick={() => selectedTipos = []}
+                      class="text-[10px] text-red-500 font-bold hover:underline"
+                    >
+                      Limpiar
+                    </button>
+                  {/if}
+                </div>
+                <div class="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                  {#if todosTiposNovedad.length === 0}
+                    <p class="text-[11px] text-texto-grey text-center py-2">No hay novedades disponibles</p>
+                  {:else}
+                    {#each todosTiposNovedad as tipo}
+                      <label class="flex items-center gap-2 p-1.5 hover:bg-fondo-soft rounded-lg cursor-pointer transition-all">
+                        <input
+                          type="checkbox"
+                          value={tipo}
+                          checked={selectedTipos.includes(tipo)}
+                          onchange={(e) => {
+                            if (e.currentTarget.checked) {
+                              selectedTipos = [...selectedTipos, tipo];
+                            } else {
+                              selectedTipos = selectedTipos.filter((t) => t !== tipo);
+                            }
+                          }}
+                          class="rounded border-slate-300 text-primario focus:ring-primario"
+                        />
+                        <span class="text-[11px] font-semibold text-texto-dark truncate">{tipo}</span>
+                      </label>
+                    {/each}
+                  {/if}
+                </div>
+              </div>
+            {/if}
+          </div>
         </div>
       </div>
     </div>
@@ -819,7 +973,8 @@
                 {/if}
 
                 <div
-                  class="relative bg-white border border-fondo-soft rounded-3xl p-5 shadow-sm hover:shadow-lg transition-all duration-200 z-10 flex flex-col min-h-[260px]"
+                  oncontextmenu={(e) => handleContextMenu(e, solicitud.id)}
+                  class="relative bg-white border border-fondo-soft rounded-3xl p-5 shadow-sm hover:shadow-lg transition-all duration-200 z-10 flex flex-col min-h-[260px] cursor-context-menu"
                 >
                   {#if group.length > 1}
                     <div
@@ -834,8 +989,12 @@
                     class="flex items-start justify-between mb-5 z-20 shrink-0"
                   >
                     <div class="flex items-center gap-3 w-[70%]">
-                      <div
-                        class="w-12 h-12 rounded-full overflow-hidden bg-fondo-soft shrink-0"
+                      <!-- Foto del empleado ajustada a un tamaño un poco más grande (w-14 h-14) -->
+                      <button
+                        type="button"
+                        class="w-14 h-14 rounded-full overflow-hidden bg-fondo-soft shrink-0 text-left p-0 border-0 focus:outline-none focus:ring-2 focus:ring-primario/50 {solicitud.foto ? 'cursor-pointer hover:ring-2 hover:ring-primario/50 transition-all' : ''}"
+                        onclick={() => solicitud.foto && openImageModal(solicitud.foto, solicitud.nombre_empleado)}
+                        disabled={!solicitud.foto}
                       >
                         {#if solicitud.foto}
                           <img
@@ -853,7 +1012,7 @@
                               .join("")}</span
                           >
                         {/if}
-                      </div>
+                      </button>
                       <div class="min-w-0">
                         <h4
                           class="text-[13px] font-extrabold text-texto-dark leading-tight line-clamp-2"
@@ -1080,14 +1239,19 @@
         </div>
       {:else}
         <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {#each $solicitudesRecientes as sol}
+          {#each solicitudesRecientesFiltradas as sol}
             <div
-              class="relative bg-white border border-fondo-soft rounded-3xl p-5 shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col min-h-[280px]"
+              oncontextmenu={(e) => handleContextMenu(e, sol.id)}
+              class="relative bg-white border border-fondo-soft rounded-3xl p-5 shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col min-h-[280px] cursor-context-menu"
             >
               <div class="flex items-start justify-between mb-4 shrink-0">
                 <div class="flex items-center gap-3 w-[70%]">
-                  <div
-                    class="w-12 h-12 rounded-full overflow-hidden bg-fondo-soft shrink-0"
+                  <!-- Foto del empleado ajustada a un tamaño un poco más grande (w-14 h-14) -->
+                  <button
+                    type="button"
+                    class="w-14 h-14 rounded-full overflow-hidden bg-fondo-soft shrink-0 text-left p-0 border-0 focus:outline-none focus:ring-2 focus:ring-primario/50 {sol.foto ? 'cursor-pointer hover:ring-2 hover:ring-primario/50 transition-all' : ''}"
+                    onclick={() => sol.foto && openImageModal(sol.foto, sol.nombre_empleado)}
+                    disabled={!sol.foto}
                   >
                     {#if sol.foto}
                       <img
@@ -1105,7 +1269,7 @@
                           .join("")}</span
                       >
                     {/if}
-                  </div>
+                  </button>
                   <div class="min-w-0">
                     <h4
                       class="text-[13px] font-extrabold text-texto-dark leading-tight line-clamp-2"
@@ -1348,7 +1512,7 @@
               {selectedDayData.date}
             </h2>
             <p class="text-xs text-texto-grey">
-              {semanaInfo?.label ?? weekInfo.label}
+              {semanaInfo?.label ?? ''}
             </p>
           </div>
         </div>
@@ -1385,7 +1549,11 @@
                 Total de Solicitudes
               </p>
               <p class="font-display text-4xl font-extrabold text-texto-dark">
-                {selectedDayData.count}
+                {areaForzada === "operaciones"
+                  ? selectedDayData.operaciones.total
+                  : areaForzada === "mantenimiento"
+                  ? selectedDayData.mantenimiento.total
+                  : selectedDayData.count}
               </p>
             </div>
             <div
@@ -1405,6 +1573,66 @@
                 />
               </svg>
             </div>
+          </div>
+        </div>
+
+        <!-- Desglose por Área -->
+        <div class="mb-5">
+          <h3
+            class="font-display text-xs font-bold text-texto-grey uppercase tracking-wider mb-3"
+          >
+            {areaForzada ? "Resumen de Área" : "Desglose por Área"}
+          </h3>
+          <div class={areaForzada ? "grid grid-cols-1 gap-4" : "grid grid-cols-2 gap-4"}>
+            <!-- Operaciones -->
+            {#if !areaForzada || areaForzada === "operaciones"}
+              <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-4">
+                <h4 class="text-[11px] font-bold text-blue-600 uppercase tracking-wider mb-2">Operaciones</h4>
+                <div class="space-y-1 text-xs">
+                  <div class="flex justify-between">
+                    <span class="text-texto-grey">Total:</span>
+                    <span class="font-bold text-texto-dark">{selectedDayData.operaciones.total}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-texto-grey">Pedidas:</span>
+                    <span class="font-bold text-amber-600">{selectedDayData.operaciones.pendientes}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-texto-grey">Aprobadas:</span>
+                    <span class="font-bold text-emerald-600">{selectedDayData.operaciones.aprobadas}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-texto-grey">Rechazadas:</span>
+                    <span class="font-bold text-red-600">{selectedDayData.operaciones.rechazadas}</span>
+                  </div>
+                </div>
+              </div>
+            {/if}
+
+            <!-- Mantenimiento -->
+            {#if !areaForzada || areaForzada === "mantenimiento"}
+              <div class="bg-purple-50/50 border border-purple-100 rounded-xl p-4">
+                <h4 class="text-[11px] font-bold text-purple-600 uppercase tracking-wider mb-2">Mantenimiento</h4>
+                <div class="space-y-1 text-xs">
+                  <div class="flex justify-between">
+                    <span class="text-texto-grey">Total:</span>
+                    <span class="font-bold text-texto-dark">{selectedDayData.mantenimiento.total}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-texto-grey">Pedidas:</span>
+                    <span class="font-bold text-amber-600">{selectedDayData.mantenimiento.pendientes}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-texto-grey">Aprobadas:</span>
+                    <span class="font-bold text-emerald-600">{selectedDayData.mantenimiento.aprobadas}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-texto-grey">Rechazadas:</span>
+                    <span class="font-bold text-red-600">{selectedDayData.mantenimiento.rechazadas}</span>
+                  </div>
+                </div>
+              </div>
+            {/if}
           </div>
         </div>
 
@@ -1458,6 +1686,157 @@
           class="px-5 py-2 bg-white border border-fondo-soft text-texto-grey rounded-xl text-xs font-bold hover:bg-fondo-soft hover:-translate-y-0.5 active:scale-95 transition-all duration-200"
         >
           Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Modal de Foto Ampliada -->
+{#if imageModalOpen && selectedImage}
+  <div
+    class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md"
+    onclick={closeImageModal}
+    onkeydown={(e) => e.key === "Escape" && closeImageModal()}
+    role="button"
+    tabindex="-1"
+  >
+    <div
+      class="relative max-w-4xl max-h-[90vh] bg-white p-3 rounded-3xl shadow-2xl overflow-hidden flex flex-col items-center border border-fondo-soft"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      tabindex="0"
+    >
+      <button
+        onclick={closeImageModal}
+        aria-label="Cerrar vista de imagen"
+        class="absolute top-4 right-4 w-9 h-9 bg-black/40 hover:bg-black/60 text-white rounded-full flex items-center justify-center transition-all z-10 border border-white/20"
+      >
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2.5"
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+      <img
+        src={selectedImage}
+        alt={selectedImageAlt}
+        class="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-inner"
+      />
+      {#if selectedImageAlt}
+        <div class="pt-3 text-center">
+          <p class="text-sm font-extrabold text-texto-dark">{selectedImageAlt}</p>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/if}
+
+<!-- Menú Contextual para click derecho -->
+{#if contextMenuOpen}
+  <div
+    class="fixed inset-0 z-50 cursor-default"
+    onclick={closeContextMenu}
+    oncontextmenu={(e) => { e.preventDefault(); closeContextMenu(); }}
+    role="button"
+    tabindex="-1"
+    aria-label="Cerrar menú contextual"
+  ></div>
+
+  <div
+    class="fixed z-50 bg-white border border-fondo-soft rounded-2xl shadow-xl py-1.5 min-w-[160px] overflow-hidden"
+    style="top: {contextMenuY}px; left: {contextMenuX}px;"
+    onclick={(e) => e.stopPropagation()}
+    onkeydown={(e) => e.stopPropagation()}
+    role="menu"
+    tabindex="0"
+  >
+    <button
+      onclick={showDeleteConfirmation}
+      class="w-full px-4 py-2.5 text-left text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors duration-150 border-0 outline-none"
+      role="menuitem"
+    >
+      <svg
+        class="w-4 h-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+        />
+      </svg>
+      Eliminar Solicitud
+    </button>
+  </div>
+{/if}
+
+<!-- Modal Personalizado de Confirmación de Eliminación -->
+{#if deleteConfirmModalOpen && deleteConfirmSolicitudId !== null}
+  <div
+    class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-fade-in"
+    onclick={closeDeleteConfirmation}
+    onkeydown={(e) => e.key === "Escape" && closeDeleteConfirmation()}
+    role="button"
+    tabindex="-1"
+    aria-label="Cerrar confirmación"
+  >
+    <div
+      class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-fondo-soft p-6 text-center"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+      role="dialog"
+      aria-modal="true"
+      tabindex="0"
+    >
+      <div class="w-14 h-14 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <svg
+          class="w-6 h-6 text-red-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+          />
+        </svg>
+      </div>
+
+      <h3 class="font-display text-lg font-bold text-texto-dark mb-2">
+        ¿Eliminar Solicitud #{deleteConfirmSolicitudId}?
+      </h3>
+      <p class="text-xs text-texto-grey mb-6 leading-relaxed">
+        Esta acción eliminará de forma permanente la solicitud del sistema. Esta acción no se puede deshacer.
+      </p>
+
+      <div class="flex gap-3 justify-end">
+        <button
+          onclick={closeDeleteConfirmation}
+          class="px-5 py-2.5 bg-white border border-fondo-soft text-texto-grey rounded-xl text-xs font-bold hover:bg-fondo-soft active:scale-95 transition-all duration-200"
+        >
+          Cancelar
+        </button>
+        <button
+          onclick={executeEliminarSolicitud}
+          class="px-5 py-2.5 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 hover:shadow-md hover:shadow-red-500/20 active:scale-95 transition-all duration-200"
+        >
+          Eliminar
         </button>
       </div>
     </div>

@@ -250,7 +250,7 @@ func CreatePermiso(c *fiber.Ctx) error {
 	}
 
 	dbInstance := db.GetSolicitudPermisosDB()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if hora == "" {
@@ -464,7 +464,7 @@ func CreateExtemporaneo(c *fiber.Ctx) error {
 	}
 
 	dbInstance := db.GetSolicitudPermisosDB()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	query := `INSERT INTO solicitudes_permisos

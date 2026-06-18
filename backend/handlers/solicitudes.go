@@ -132,9 +132,40 @@ func GetSemanaSolicitudes(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	var fechasList []time.Time
+	var datesQuery string
+	var queryArgs []interface{}
+	semanaStr := semanaInicio.Format("2006-01-02")
+
+	if area == "operaciones" || area == "mantenimiento" {
+		datesQuery = `SELECT DISTINCT fecha FROM fechas_solicitudes WHERE semana_inicio = ? AND area = ? ORDER BY fecha ASC`
+		queryArgs = append(queryArgs, semanaStr, area)
+	} else {
+		datesQuery = `SELECT DISTINCT fecha FROM fechas_solicitudes WHERE semana_inicio = ? ORDER BY fecha ASC`
+		queryArgs = append(queryArgs, semanaStr)
+	}
+
+	rowsDates, err := mysqlDB.QueryContext(ctx, datesQuery, queryArgs...)
+	if err == nil {
+		for rowsDates.Next() {
+			var t time.Time
+			if err := rowsDates.Scan(&t); err == nil {
+				fechasList = append(fechasList, t)
+			}
+		}
+		rowsDates.Close()
+	}
+
+	if len(fechasList) == 0 {
+		temp := semanaInicio
+		for i := 0; i < 7; i++ {
+			fechasList = append(fechasList, temp)
+			temp = temp.AddDate(0, 0, 1)
+		}
+	}
+
 	var dias []models.DiaSolicitudInfo
-	current := semanaInicio
-	for i := 0; i < 7; i++ {
+	for _, current := range fechasList {
 		fechaStr := current.Format("2006-01-02")
 		dia := models.DiaSolicitudInfo{
 			Fecha:     fechaStr,
@@ -152,45 +183,82 @@ func GetSemanaSolicitudes(c *fiber.Ctx) error {
 		}
 
 		rows, err := mysqlDB.QueryContext(ctx,
-			`SELECT tipo_novedad, COUNT(*) as cantidad
+			`SELECT tipo_usuario, estado, tipo_novedad
 			 FROM solicitudes_permisos
-			 WHERE FIND_IN_SET(?, REPLACE(fecha_solicitud, ' ', '')) > 0`+areaFilter+`
-			 GROUP BY tipo_novedad
-			 ORDER BY cantidad DESC`, fechaStr)
+			 WHERE FIND_IN_SET(?, REPLACE(fecha_solicitud, ' ', '')) > 0`+areaFilter, fechaStr)
 		if err != nil {
 			log.Printf("Error consultando solicitudes para %s: %v", fechaStr, err)
-			current = current.AddDate(0, 0, 1)
 			dias = append(dias, dia)
 			continue
 		}
 
-		var tipos []models.TipoCantidad
+		tiposMap := make(map[string]int)
+		var opStats models.AreaStats
+		var mantStats models.AreaStats
 		total := 0
+
 		for rows.Next() {
-			var tc models.TipoCantidad
-			if err := rows.Scan(&tc.Tipo, &tc.Cantidad); err != nil {
+			var tipoUsuario, estado, tipoNovedad string
+			if err := rows.Scan(&tipoUsuario, &estado, &tipoNovedad); err != nil {
 				continue
 			}
-			total += tc.Cantidad
-			tipos = append(tipos, tc)
+
+			tipoUsuario = strings.TrimSpace(tipoUsuario)
+			estado = strings.TrimSpace(estado)
+			tipoNovedad = strings.TrimSpace(tipoNovedad)
+
+			tiposMap[tipoNovedad]++
+			total++
+
+			if tipoUsuario == "se_operaciones" {
+				opStats.Total++
+				switch estado {
+				case "Aceptada":
+					opStats.Aprobadas++
+				case "Rechazada":
+					opStats.Rechazadas++
+				case "Pendiente":
+					opStats.Pendientes++
+				}
+			} else if tipoUsuario == "se_mantenimiento" {
+				mantStats.Total++
+				switch estado {
+				case "Aceptada":
+					mantStats.Aprobadas++
+				case "Rechazada":
+					mantStats.Rechazadas++
+				case "Pendiente":
+					mantStats.Pendientes++
+				}
+			}
 		}
 		rows.Close()
+
+		var tipos []models.TipoCantidad
+		for t, cant := range tiposMap {
+			tipos = append(tipos, models.TipoCantidad{
+				Tipo:     t,
+				Cantidad: cant,
+			})
+		}
 		dia.Total = total
 		dia.Tipos = tipos
+		dia.Operaciones = opStats
+		dia.Mantenimiento = mantStats
 
 		dias = append(dias, dia)
-		current = current.AddDate(0, 0, 1)
 	}
 
 	return c.JSON(models.SemanaSolicitudResponse{
 		Success: true,
 		Message: "OK",
 		Semana: &models.SemanaInfo{
-			Label: semanaLabel,
-			Dates: fmt.Sprintf("%d %s - %d %s, %d",
+			Label:  semanaLabel,
+			Dates:  fmt.Sprintf("%d %s - %d %s, %d",
 				semanaInicio.Day(), mesesAbreviados[semanaInicio.Month()-1],
 				semanaFin.Day(), mesesAbreviados[semanaFin.Month()-1],
 				semanaFin.Year()),
+			Inicio: semanaInicio.Format("2006-01-02"),
 		},
 		Dias: dias,
 	})
@@ -379,5 +447,46 @@ func GetStatsGeneral(c *fiber.Ctx) error {
 		Aprobadas:  aprobadas,
 		Pendientes: pendientes,
 		Rechazadas: rechazadas,
+	})
+}
+
+func EliminarSolicitud(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"message": "ID de solicitud requerido",
+		})
+	}
+
+	dbInstance := db.GetSolicitudPermisosDB()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	query := `DELETE FROM solicitudes_permisos WHERE id = ?`
+	result, err := dbInstance.ExecContext(ctx, query, id)
+	if err != nil {
+		log.Printf("Error eliminando solicitud %s: %v", id, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"message": "Error al eliminar la solicitud: " + err.Error(),
+		})
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("Error obteniendo filas afectadas al eliminar solicitud %s: %v", id, err)
+	}
+
+	if rowsAffected == 0 {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"success": false,
+			"message": "La solicitud no existe o ya fue eliminada",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"message": "Solicitud eliminada exitosamente",
 	})
 }
