@@ -191,30 +191,47 @@ type CrearAnuncioRequest struct {
 }
 
 type ActualizarAnuncioRequest struct {
-	Titulo string `json:"titulo,omitempty"`
-	Activo bool   `json:"activo"`
+	Titulo          string `json:"titulo,omitempty"`
+	Activo          bool   `json:"activo"`
+	DocumentoActivo *bool  `json:"documento_activo,omitempty"`
 }
 
 type AnuncioDetalle struct {
-	ID        uint   `json:"id"`
-	VideoID   string `json:"video_id"`
-	Url       string `json:"url"`
-	Titulo    string `json:"titulo,omitempty"`
-	Activo    bool   `json:"activo"`
-	CreadoPor string `json:"creado_por,omitempty"`
-	Tipo      string `json:"tipo,omitempty"`
+	ID              uint   `json:"id"`
+	VideoID         string `json:"video_id"`
+	Url             string `json:"url"`
+	Titulo          string `json:"titulo,omitempty"`
+	Activo          bool   `json:"activo"`
+	CreadoPor       string `json:"creado_por,omitempty"`
+	Tipo            string `json:"tipo,omitempty"`
+	DocumentoUrl    string `json:"documento_url,omitempty"`
+	DocumentoTipo   string `json:"documento_tipo,omitempty"`
+	DocumentoActivo bool   `json:"documento_activo"`
+}
+
+type HistorialActivo struct {
+	ID          uint   `json:"id"`
+	AnuncioID   uint   `json:"anuncio_id"`
+	FechaInicio string `json:"fecha_inicio"`
+	FechaFin    string `json:"fecha_fin,omitempty"`
+	Vistas      int    `json:"vistas"`
+	Duracion    string `json:"duracion,omitempty"`
 }
 
 type AnuncioConVistas struct {
-	ID            uint   `json:"id"`
-	VideoID       string `json:"video_id"`
-	Url           string `json:"url"`
-	Titulo        string `json:"titulo,omitempty"`
-	Activo        bool   `json:"activo"`
-	CreadoPor     string `json:"creado_por,omitempty"`
-	FechaCreacion string `json:"fecha_creacion"`
-	TotalVistas   int    `json:"total_vistas"`
-	Tipo          string `json:"tipo,omitempty"`
+	ID              uint              `json:"id"`
+	VideoID         string            `json:"video_id"`
+	Url             string            `json:"url"`
+	Titulo          string            `json:"titulo,omitempty"`
+	Activo          bool              `json:"activo"`
+	CreadoPor       string            `json:"creado_por,omitempty"`
+	FechaCreacion   string            `json:"fecha_creacion"`
+	TotalVistas     int               `json:"total_vistas"`
+	Tipo            string            `json:"tipo,omitempty"`
+	Historial       []HistorialActivo `json:"historial,omitempty"`
+	DocumentoUrl    string            `json:"documento_url,omitempty"`
+	DocumentoTipo   string            `json:"documento_tipo,omitempty"`
+	DocumentoActivo bool              `json:"documento_activo"`
 }
 
 type AnuncioResponse struct {

@@ -84,6 +84,35 @@ func (s *S3Service) UploadFile(ctx context.Context, file io.Reader, originalFile
 	return url, nil
 }
 
+func (s *S3Service) UploadAnuncioFile(ctx context.Context, file io.Reader, originalFilename string, cedula string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(originalFilename))
+	if ext == "" {
+		ext = ".bin"
+	}
+
+	key := fmt.Sprintf("anuncios/%s/%d_%s%s",
+		cedula,
+		time.Now().UnixMilli(),
+		utils.GenerateRandomString(8),
+		ext,
+	)
+
+	contentType := getContentType(ext)
+
+	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(s.bucket),
+		Key:         aws.String(key),
+		Body:        file,
+		ContentType: aws.String(contentType),
+	})
+	if err != nil {
+		return "", fmt.Errorf("error subiendo archivo a S3: %w", err)
+	}
+
+	url := fmt.Sprintf("https://s3.%s.amazonaws.com/%s/%s", s.region, s.bucket, key)
+	return url, nil
+}
+
 func (s *S3Service) IsEnabled() bool {
 	return s != nil && s.client != nil
 }
@@ -115,6 +144,27 @@ func (s *S3Service) GeneratePresignedURL(key string, expiration time.Duration) (
 		return "", fmt.Errorf("error generando presigned URL: %w", err)
 	}
 	return req.URL, nil
+}
+
+func (s *S3Service) GetObject(ctx context.Context, key string) (io.ReadCloser, string, error) {
+	if !s.IsEnabled() {
+		return nil, "", fmt.Errorf("servicio S3 no está habilitado")
+	}
+
+	out, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	contentType := "application/octet-stream"
+	if out.ContentType != nil {
+		contentType = *out.ContentType
+	}
+
+	return out.Body, contentType, nil
 }
 
 func (s *S3Service) GeneratePresignedURLFromS3URL(s3Url string, expiration time.Duration) (string, error) {

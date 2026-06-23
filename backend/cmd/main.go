@@ -65,6 +65,7 @@ func main() {
 
 	auth := app.Group("/api/auth")
 	auth.Post("/login", handlers.Login)
+	app.Get("/public/anuncios/:id/documento", handlers.GetDocumentoAnuncio)
 
 	app.Use("/api", middleware.JWTAuth())
 	app.Get("/api/me", handlers.Me)
@@ -91,6 +92,7 @@ func main() {
 	app.Post("/api/anuncios/:id/vista", handlers.RegistrarVista)
 	app.Get("/api/anuncios/:id/vista/ultima", handlers.GetUltimaVista)
 	app.Get("/api/anuncios/:id/vistas", handlers.GetEstadisticasVistas)
+	app.Post("/api/anuncios/:id/documento", handlers.SubirDocumentoAnuncio)
 
 	app.Get("/api/fechas-solicitudes", handlers.GetFechasSolicitudes)
 	app.Put("/api/fechas-solicitudes", handlers.UpdateFechas)

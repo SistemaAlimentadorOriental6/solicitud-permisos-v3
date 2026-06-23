@@ -97,6 +97,18 @@ export interface AnuncioDetalle {
   activo: boolean;
   creado_por?: string;
   tipo?: string;
+  documento_url?: string;
+  documento_tipo?: string;
+  documento_activo: boolean;
+}
+
+export interface HistorialActivo {
+  id: number;
+  anuncio_id: number;
+  fecha_inicio: string;
+  fecha_fin?: string;
+  vistas: number;
+  duracion?: string;
 }
 
 export interface AnuncioConVistas {
@@ -109,6 +121,10 @@ export interface AnuncioConVistas {
   fecha_creacion: string;
   total_vistas: number;
   tipo?: string;
+  historial?: HistorialActivo[];
+  documento_url?: string;
+  documento_tipo?: string;
+  documento_activo: boolean;
 }
 
 export interface AnuncioResponse {
@@ -124,7 +140,7 @@ export interface AnunciosListResponse {
   anuncios: AnuncioConVistas[];
 }
 
-export async function getAnuncioActivo(tipo?: string): Promise<{ success: boolean; message: string; anuncio: AnuncioDetalle | null }> {
+export async function getAnuncioActivo(tipo?: string): Promise<{ success: boolean; message: string; anuncio: AnuncioDetalle | null; anuncios?: AnuncioDetalle[] }> {
   const token = localStorage.getItem('token');
 
   const url = tipo
@@ -153,21 +169,41 @@ export async function listarAnuncios(): Promise<AnunciosListResponse> {
 export async function crearAnuncio(url: string, titulo?: string, tipo?: string): Promise<AnuncioResponse> {
   const token = localStorage.getItem('token');
 
+  const formData = new FormData();
+  formData.append('url', url);
+  if (titulo) formData.append('titulo', titulo);
+  if (tipo) formData.append('tipo', tipo);
+
   const response = await fetch(`${API_BASE_URL}/api/anuncios/crear`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ url, titulo, tipo }),
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
   });
 
   return response.json();
 }
 
-export async function actualizarAnuncio(id: number, titulo?: string, activo?: boolean): Promise<AnuncioResponse> {
+export async function subirDocumentoAnuncio(id: number, documento: File): Promise<{ success: boolean; message: string; url?: string }> {
+  const token = localStorage.getItem('token');
+  const formData = new FormData();
+  formData.append('documento', documento);
+
+  const response = await fetch(`${API_BASE_URL}/api/anuncios/${id}/documento`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
+  });
+
+  return response.json();
+}
+
+export async function actualizarAnuncio(id: number, titulo?: string, activo?: boolean, documentoActivo?: boolean): Promise<AnuncioResponse> {
   const token = localStorage.getItem('token');
 
-  const body: { titulo?: string; activo?: boolean } = {};
+  const body: { titulo?: string; activo?: boolean; documento_activo?: boolean } = {};
   if (titulo !== undefined) body.titulo = titulo;
   if (activo !== undefined) body.activo = activo;
+  if (documentoActivo !== undefined) body.documento_activo = documentoActivo;
 
   const response = await fetch(`${API_BASE_URL}/api/anuncios/${id}`, {
     method: 'PUT',

@@ -2,8 +2,9 @@
   import { onMount, onDestroy } from "svelte";
   import { Video01Icon, Link01Icon, Delete01Icon, ToggleOnIcon, EyeIcon, Refresh01Icon } from '@hugeicons/core-free-icons';
   import { HugeiconsIcon } from '@hugeicons/svelte';
-  import { crearAnuncio, listarAnuncios, actualizarAnuncio, eliminarAnuncio } from "$lib/shared/config/api";
+  import { crearAnuncio, listarAnuncios, actualizarAnuncio, eliminarAnuncio, subirDocumentoAnuncio, API_BASE_URL } from "$lib/shared/config/api";
   import type { AnuncioConVistas } from "$lib/shared/config/api";
+  import LoadingOverlay from "$lib/shared/components/LoadingOverlay.svelte";
 
   let videoUrl = $state('');
   let videoId = $state('');
@@ -17,6 +18,38 @@
   let refreshing = $state(false);
   let lastUpdate = $state('');
   let refreshInterval: number | null = null;
+  let selectedAnuncio = $state<AnuncioConVistas | null>(null);
+  let showHistoryModal = $state(false);
+  let selectedDocUrl = $state<string | null>(null);
+  let selectedDocTipo = $state<string | null>(null);
+  let showDocModal = $state(false);
+  let docLoading = $state(false);
+  let docTimer: ReturnType<typeof setTimeout> | null = null;
+  const isSelectedDocPdf = $derived(selectedDocTipo === 'pdf');
+
+  function getDocUrl(anuncioId: number): string {
+    return `${API_BASE_URL}/public/anuncios/${anuncioId}/documento`;
+  }
+
+  function openDocModal(anuncio: AnuncioConVistas) {
+    selectedDocUrl = getDocUrl(anuncio.id);
+    selectedDocTipo = anuncio.documento_tipo || null;
+    showDocModal = true;
+    docLoading = true;
+    if (docTimer) clearTimeout(docTimer);
+    docTimer = setTimeout(() => { docLoading = false; }, 15000);
+  }
+
+  function closeDocModal() {
+    if (docTimer) { clearTimeout(docTimer); docTimer = null; }
+    showDocModal = false;
+    selectedDocUrl = null;
+    selectedDocTipo = null;
+    docLoading = false;
+  }
+
+  const activosOperaciones = $derived(anuncios.filter(a => (a.tipo === 'operaciones' || !a.tipo) && a.activo).length);
+  const activosMantenimiento = $derived(anuncios.filter(a => a.tipo === 'mantenimiento' && a.activo).length);
 
   function extractYouTubeId(url: string): string {
     const patterns = [
@@ -69,10 +102,53 @@
     }
   }
 
+  async function handleUploadDocumento(id: number, event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    if (!input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    loading = true;
+    const res = await subirDocumentoAnuncio(id, file);
+    loading = false;
+
+    if (res.success) {
+      mostrarMensaje('Documento anexado con éxito', 'success');
+      await cargarAnuncios();
+    } else {
+      mostrarMensaje(res.message, 'error');
+    }
+    input.value = '';
+  }
+
   async function handleToggleActivo(anuncio: AnuncioConVistas) {
+    if (!anuncio.activo) {
+      const tipo = anuncio.tipo === 'mantenimiento' ? 'mantenimiento' : 'operaciones';
+      const activos = tipo === 'mantenimiento' ? activosMantenimiento : activosOperaciones;
+      if (activos >= 3) {
+        mostrarMensaje(`No puedes activar más de 3 videos para el área de ${tipo}`, 'error');
+        return;
+      }
+    }
+
+    loading = true;
     const res = await actualizarAnuncio(anuncio.id, anuncio.titulo, !anuncio.activo);
+    loading = false;
+
     if (res.success) {
       mostrarMensaje('Anuncio actualizado', 'success');
+      await cargarAnuncios();
+    } else {
+      mostrarMensaje(res.message, 'error');
+    }
+  }
+
+  async function handleToggleDocActivo(anuncio: AnuncioConVistas) {
+    loading = true;
+    const res = await actualizarAnuncio(anuncio.id, anuncio.titulo, anuncio.activo, !anuncio.documento_activo);
+    loading = false;
+
+    if (res.success) {
+      mostrarMensaje('Estado del documento actualizado', 'success');
       await cargarAnuncios();
     } else {
       mostrarMensaje(res.message, 'error');
@@ -119,6 +195,9 @@
   onDestroy(() => {
     if (refreshInterval) {
       clearInterval(refreshInterval);
+    }
+    if (docTimer) {
+      clearTimeout(docTimer);
     }
   });
 </script>
@@ -219,6 +298,7 @@
                 </button>
               </div>
             </div>
+
           </div>
         </div>
 
@@ -296,7 +376,8 @@
                 <div class="flex items-center gap-2 mb-4">
                   <div class="w-2 h-2 rounded-full bg-primario"></div>
                   <h3 class="text-sm font-bold text-texto-dark uppercase tracking-wider">Operaciones</h3>
-                  <span class="px-2 py-0.5 bg-primario/10 text-primario text-xs font-bold rounded-full">{anunciosOperaciones.length}</span>
+                  <span class="px-2 py-0.5 bg-primario/10 text-primario text-xs font-bold rounded-full">Total: {anunciosOperaciones.length}</span>
+                  <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">Activos: {activosOperaciones} / 3</span>
                 </div>
                 <div class="space-y-3">
                   {#each anunciosOperaciones as anuncio (anuncio.id)}
@@ -332,6 +413,70 @@
 
                       <!-- Actions -->
                       <div class="flex items-center gap-2 flex-shrink-0">
+                        <input
+                          id="doc-upload-{anuncio.id}"
+                          type="file"
+                          accept=".pdf,image/*"
+                          class="hidden"
+                          onchange={(e) => handleUploadDocumento(anuncio.id, e)}
+                        />
+
+                        {#if anuncio.documento_url}
+                          <button
+                            onclick={() => openDocModal(anuncio)}
+                            class="p-2 rounded-lg hover:bg-white transition-colors text-primario"
+                            title="Ver Documento Adjunto"
+                          >
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </button>
+                          <button
+                            onclick={() => handleToggleDocActivo(anuncio)}
+                            class="p-2 rounded-lg hover:bg-white transition-colors {anuncio.documento_activo ? 'text-green-600' : 'text-texto-grey/40'}"
+                            title={anuncio.documento_activo ? "Inhabilitar Documento Adjunto" : "Habilitar Documento Adjunto"}
+                          >
+                            {#if anuncio.documento_activo}
+                              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            {:else}
+                              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                              </svg>
+                            {/if}
+                          </button>
+                          <button
+                            onclick={() => document.getElementById(`doc-upload-${anuncio.id}`)?.click()}
+                            class="p-2 rounded-lg hover:bg-white transition-colors text-texto-grey hover:text-primario"
+                            title="Cambiar Documento Adjunto"
+                          >
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                          </button>
+                        {:else}
+                          <button
+                            onclick={() => document.getElementById(`doc-upload-${anuncio.id}`)?.click()}
+                            class="p-2 rounded-lg hover:bg-white transition-colors text-texto-grey hover:text-primario"
+                            title="Anexar Documento (PDF o Imagen)"
+                          >
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                          </button>
+                        {/if}
+
+                        <button
+                          onclick={() => { selectedAnuncio = anuncio; showHistoryModal = true; }}
+                          class="p-2 rounded-lg hover:bg-white transition-colors"
+                          title="Ver Historial de Actividad"
+                        >
+                          <svg class="w-5 h-5 text-texto-grey hover:text-primario transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
                         <button
                           onclick={() => handleToggleActivo(anuncio)}
                           class="p-2 rounded-lg hover:bg-white transition-colors"
@@ -359,7 +504,8 @@
                 <div class="flex items-center gap-2 mb-4">
                   <div class="w-2 h-2 rounded-full bg-amber-500"></div>
                   <h3 class="text-sm font-bold text-texto-dark uppercase tracking-wider">Mantenimiento</h3>
-                  <span class="px-2 py-0.5 bg-amber-50 text-amber-600 text-xs font-bold rounded-full">{anunciosMantenimiento.length}</span>
+                  <span class="px-2 py-0.5 bg-amber-50 text-amber-600 text-xs font-bold rounded-full">Total: {anunciosMantenimiento.length}</span>
+                  <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">Activos: {activosMantenimiento} / 3</span>
                 </div>
                 <div class="space-y-3">
                   {#each anunciosMantenimiento as anuncio (anuncio.id)}
@@ -395,6 +541,70 @@
 
                       <!-- Actions -->
                       <div class="flex items-center gap-2 flex-shrink-0">
+                        <input
+                          id="doc-upload-{anuncio.id}"
+                          type="file"
+                          accept=".pdf,image/*"
+                          class="hidden"
+                          onchange={(e) => handleUploadDocumento(anuncio.id, e)}
+                        />
+
+                        {#if anuncio.documento_url}
+                          <button
+                            onclick={() => openDocModal(anuncio)}
+                            class="p-2 rounded-lg hover:bg-white transition-colors text-primario"
+                            title="Ver Documento Adjunto"
+                          >
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </button>
+                          <button
+                            onclick={() => handleToggleDocActivo(anuncio)}
+                            class="p-2 rounded-lg hover:bg-white transition-colors {anuncio.documento_activo ? 'text-green-600' : 'text-texto-grey/40'}"
+                            title={anuncio.documento_activo ? "Inhabilitar Documento Adjunto" : "Habilitar Documento Adjunto"}
+                          >
+                            {#if anuncio.documento_activo}
+                              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            {:else}
+                              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                              </svg>
+                            {/if}
+                          </button>
+                          <button
+                            onclick={() => document.getElementById(`doc-upload-${anuncio.id}`)?.click()}
+                            class="p-2 rounded-lg hover:bg-white transition-colors text-texto-grey hover:text-primario"
+                            title="Cambiar Documento Adjunto"
+                          >
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                          </button>
+                        {:else}
+                          <button
+                            onclick={() => document.getElementById(`doc-upload-${anuncio.id}`)?.click()}
+                            class="p-2 rounded-lg hover:bg-white transition-colors text-texto-grey hover:text-primario"
+                            title="Anexar Documento (PDF o Imagen)"
+                          >
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                          </button>
+                        {/if}
+
+                        <button
+                          onclick={() => { selectedAnuncio = anuncio; showHistoryModal = true; }}
+                          class="p-2 rounded-lg hover:bg-white transition-colors"
+                          title="Ver Historial de Actividad"
+                        >
+                          <svg class="w-5 h-5 text-texto-grey hover:text-primario transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
                         <button
                           onclick={() => handleToggleActivo(anuncio)}
                           class="p-2 rounded-lg hover:bg-white transition-colors"
@@ -431,3 +641,150 @@
     </div>
   </div>
 </div>
+
+{#if showHistoryModal && selectedAnuncio}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between pb-4 border-b border-fondo-soft mb-4">
+        <div>
+          <h3 class="font-display text-lg font-bold text-texto-dark">Historial de Actividad</h3>
+          <p class="text-xs text-texto-grey">Video ID: {selectedAnuncio.video_id}</p>
+        </div>
+        <button
+          onclick={() => { showHistoryModal = false; selectedAnuncio = null; }}
+          class="p-2 rounded-xl hover:bg-fondo-soft transition-colors"
+          aria-label="Cerrar"
+        >
+          <svg class="w-5 h-5 text-texto-grey" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto space-y-4 pr-1">
+        {#if !selectedAnuncio.historial || selectedAnuncio.historial.length === 0}
+          <div class="text-center py-12">
+            <div class="w-16 h-16 bg-fondo-soft rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <svg class="w-8 h-8 text-texto-grey" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3M12 21a9 9 0 100-18 9 9 0 000 18z" />
+              </svg>
+            </div>
+            <p class="text-sm font-medium text-texto-dark">Sin registros de actividad</p>
+            <p class="text-xs text-texto-grey mt-1">Este video no registra periodos anteriores de activación.</p>
+          </div>
+        {:else}
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm border-collapse">
+              <thead>
+                <tr class="border-b border-fondo-soft text-xs font-bold text-texto-grey uppercase tracking-wider">
+                  <th class="pb-3 pr-4">Fecha Inicio</th>
+                  <th class="pb-3 pr-4">Fecha Fin</th>
+                  <th class="pb-3 pr-4">Duración Activo</th>
+                  <th class="pb-3 text-right">Vistas en Período</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-fondo-soft">
+                {#each selectedAnuncio.historial as item (item.id)}
+                  <tr class="text-texto-dark hover:bg-fondo-soft/30 transition-colors">
+                    <td class="py-3 pr-4 font-mono text-xs">{item.fecha_inicio}</td>
+                    <td class="py-3 pr-4 font-mono text-xs">
+                      {#if item.fecha_fin === 'Activo'}
+                        <span class="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full">ACTIVO AHORA</span>
+                      {:else}
+                        {item.fecha_fin}
+                      {/if}
+                    </td>
+                    <td class="py-3 pr-4 text-xs font-medium">{item.duracion || '-'}</td>
+                    <td class="py-3 text-right font-bold text-primario pr-2">
+                      {item.vistas} {item.vistas === 1 ? 'vista' : 'vistas'}
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
+      </div>
+
+      <div class="mt-6 pt-4 border-t border-fondo-soft flex justify-end">
+        <button
+          onclick={() => { showHistoryModal = false; selectedAnuncio = null; }}
+          class="px-5 py-2.5 bg-fondo-soft hover:bg-fondo-soft/80 text-texto-dark font-bold rounded-xl text-sm transition-all active:scale-95"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if showDocModal && selectedDocUrl}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-fondo-soft bg-white flex-shrink-0">
+        <div>
+          <h3 class="font-display text-lg font-bold text-texto-dark">Visualización de Documento</h3>
+          <p class="text-xs text-texto-grey">Documento adjunto al anuncio de video</p>
+        </div>
+        <button
+          onclick={closeDocModal}
+          class="p-2 rounded-xl hover:bg-fondo-soft transition-colors"
+          aria-label="Cerrar"
+        >
+          <svg class="w-5 h-5 text-texto-grey" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="flex-1 bg-fondo-soft p-4 flex items-center justify-center overflow-auto min-h-0 relative">
+        {#if docLoading}
+          <div class="absolute inset-0 flex flex-col items-center justify-center bg-fondo-soft/80 z-10 gap-3">
+            <div class="w-10 h-10 border-4 border-primario/30 border-t-primario rounded-full animate-spin"></div>
+            <p class="text-xs font-medium text-texto-grey">Cargando documento...</p>
+          </div>
+        {/if}
+
+        {#if isSelectedDocPdf}
+          <iframe
+            src={selectedDocUrl}
+            title="Vista previa PDF"
+            onload={() => docLoading = false}
+            onerror={() => docLoading = false}
+            class="w-full h-full rounded-xl border border-fondo-soft bg-white"
+          ></iframe>
+        {:else}
+          <img
+            src={selectedDocUrl}
+            alt="Vista previa documento"
+            onload={() => docLoading = false}
+            onerror={() => docLoading = false}
+            class="max-w-full max-h-full object-contain rounded-xl shadow-md bg-white"
+          />
+        {/if}
+      </div>
+
+      <div class="px-6 py-4 border-t border-fondo-soft flex justify-end bg-white flex-shrink-0">
+        <a
+          href={selectedDocUrl}
+          download
+          target="_blank"
+          rel="noopener noreferrer"
+          class="px-5 py-2.5 bg-primario hover:bg-primario/90 text-white font-bold rounded-xl text-sm transition-all active:scale-95 flex items-center gap-2 mr-3"
+        >
+          Descargar Archivo
+        </a>
+        <button
+          onclick={closeDocModal}
+          class="px-5 py-2.5 bg-fondo-soft hover:bg-fondo-soft/80 text-texto-dark font-bold rounded-xl text-sm transition-all active:scale-95"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if loading}
+  <LoadingOverlay />
+{/if}

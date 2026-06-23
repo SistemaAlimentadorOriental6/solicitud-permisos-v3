@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { fade } from 'svelte/transition';
+  import { fade } from "svelte/transition";
   import { page } from "$app/stores";
   import { currentUser, authStore } from "$lib/domains/auth";
   import {
@@ -9,9 +9,15 @@
     dashboardLoading,
   } from "$lib/domains/dashboard";
   import StatsGrid from "$lib/domains/dashboard/components/StatsGrid.svelte";
-  import { getAnuncioActivo, registrarVista, getUltimaVista } from "$lib/shared/config/api";
+  import {
+    getAnuncioActivo,
+    registrarVista,
+    getUltimaVista,
+  } from "$lib/shared/config/api";
   import type { AnuncioDetalle } from "$lib/shared/config/api";
 
+  let listaAnunciosPendientes = $state<AnuncioDetalle[]>([]);
+  let indiceAnuncioActual = $state(0);
   let currentDate = $state("");
   let showVideoModal = $state(false);
   let timeRemaining = $state(150);
@@ -22,16 +28,29 @@
   let videoVisto = $state(false);
   let playerReady = $state(false);
   let ytPlayer: any = null;
+  let verDocumento = $state(false);
+  let documentoLeido = $state(false);
+  let scrollContainer = $state<HTMLDivElement | null>(null);
+  let docLoading = $state(false);
+  let tiempoLecturaCumplido = $state(false);
+  let lecturaTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const skipVideo = $derived($page.url.searchParams.get('video') === 'false');
-  const esMantenimiento = $derived($currentUser?.area?.toLowerCase().includes('mantenimiento') ?? false);
-  const tipoAnuncio = $derived(esMantenimiento ? 'mantenimiento' : 'operaciones');
+  const skipVideo = $derived($page.url.searchParams.get("video") === "false");
+  const esMantenimiento = $derived(
+    $currentUser?.area?.toLowerCase().includes("mantenimiento") ?? false,
+  );
+  const tipoAnuncio = $derived(
+    esMantenimiento ? "mantenimiento" : "operaciones",
+  );
+  const isDocPdf = $derived(anuncioActivo?.documento_tipo === "pdf");
 
   function getBogotaDate(): string {
     const now = new Date();
     const bogotaOffset = -5;
-    const bogotaDate = new Date(now.getTime() + (now.getTimezoneOffset() + bogotaOffset * 60) * 60000);
-    return bogotaDate.toISOString().split('T')[0];
+    const bogotaDate = new Date(
+      now.getTime() + (now.getTimezoneOffset() + bogotaOffset * 60) * 60000,
+    );
+    return bogotaDate.toISOString().split("T")[0];
   }
 
   function getVideoWatchedKey(videoId: string): { key: string; date: string } {
@@ -40,26 +59,30 @@
   }
 
   function hasVideoBeenWatchedToday(videoId: string): boolean {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === "undefined") return false;
     const { key } = getVideoWatchedKey(videoId);
-    return sessionStorage.getItem(key) === 'true';
+    return sessionStorage.getItem(key) === "true";
   }
 
   function markVideoAsWatched(videoId: string): void {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     const { key } = getVideoWatchedKey(videoId);
-    sessionStorage.setItem(key, 'true');
+    sessionStorage.setItem(key, "true");
   }
 
   const shouldShowVideo = $derived(
-    !skipVideo && 
-    typeof window !== 'undefined' && 
-    sessionStorage.getItem('showWelcomeVideo') === 'true' &&
-    !!anuncioActivo && 
-    !hasVideoBeenWatchedToday(anuncioActivo.id)
+    !skipVideo &&
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("showWelcomeVideo") === "true" &&
+      !!anuncioActivo &&
+      !hasVideoBeenWatchedToday(anuncioActivo.id),
   );
 
-  const videoUrl = $derived(anuncioActivo ? `https://www.youtube.com/embed/${anuncioActivo.video_id}?enablejsapi=1&autoplay=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0` : '');
+  const videoUrl = $derived(
+    anuncioActivo
+      ? `https://www.youtube.com/embed/${anuncioActivo.video_id}?enablejsapi=1&autoplay=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&showinfo=0`
+      : "",
+  );
 
   function loadYouTubeAPI(): Promise<void> {
     return new Promise((resolve) => {
@@ -71,24 +94,129 @@
       const existingCallback = (window as any).onYouTubeIframeAPIReady;
 
       (window as any).onYouTubeIframeAPIReady = () => {
-        if (typeof existingCallback === 'function') {
+        if (typeof existingCallback === "function") {
           existingCallback();
         }
         resolve();
       };
 
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName("script")[0];
       firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
     });
   }
 
+  function iniciarContador() {
+    if (intervalId) clearInterval(intervalId);
+    intervalId = window.setInterval(() => {
+      if (timeRemaining > 0) {
+        timeRemaining--;
+      } else if (!videoVisto) {
+        handleVideoTerminado();
+      }
+    }, 1000);
+  }
+
+  async function handleVideoTerminado() {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+
+    if (anuncioActivo) {
+      markVideoAsWatched(anuncioActivo.id);
+      await registrarVista(anuncioActivo.id);
+    }
+
+    if (
+      anuncioActivo &&
+      anuncioActivo.documento_url &&
+      anuncioActivo.documento_activo
+    ) {
+      verDocumento = true;
+      documentoLeido = false;
+      tiempoLecturaCumplido = false;
+      docLoading = true;
+    } else {
+      irAlSiguienteAnuncioOFinalizar();
+    }
+  }
+
+  function handleDocLoad() {
+    docLoading = false;
+    tiempoLecturaCumplido = false;
+    if (lecturaTimer) clearTimeout(lecturaTimer);
+    lecturaTimer = setTimeout(() => {
+      tiempoLecturaCumplido = true;
+    }, 8000); // 8 segundos obligatorios de lectura
+
+    setTimeout(() => {
+      if (
+        scrollContainer &&
+        scrollContainer.scrollHeight <= scrollContainer.clientHeight
+      ) {
+        documentoLeido = true;
+      }
+    }, 600);
+  }
+
+  function irAlSiguienteAnuncioOFinalizar() {
+    verDocumento = false;
+    documentoLeido = false;
+    tiempoLecturaCumplido = false;
+    docLoading = false;
+    if (lecturaTimer) {
+      clearTimeout(lecturaTimer);
+      lecturaTimer = null;
+    }
+
+    if (indiceAnuncioActual < listaAnunciosPendientes.length - 1) {
+      indiceAnuncioActual++;
+      anuncioActivo = listaAnunciosPendientes[indiceAnuncioActual];
+      videoVisto = false;
+      playerReady = false;
+      timeRemaining = 150;
+      totalTime = 150;
+
+      // Destruir el reproductor anterior de YouTube para evitar referencias huérfanas
+      if (ytPlayer) {
+        try {
+          if (typeof ytPlayer.destroy === "function") {
+            ytPlayer.destroy();
+          }
+        } catch (e) {
+          console.error("Error al destruir reproductor de YouTube:", e);
+        }
+        ytPlayer = null;
+      }
+
+      // Reinicializar el nuevo reproductor sobre el nuevo iframe
+      setTimeout(() => {
+        initPlayer();
+      }, 500);
+    } else {
+      canClose = true;
+      videoVisto = true;
+      sessionStorage.removeItem("showWelcomeVideo");
+      setTimeout(() => {
+        showVideoModal = false;
+      }, 500);
+    }
+  }
+
+  function handleScroll(e: Event) {
+    if (docLoading) return;
+    const target = e.currentTarget as HTMLDivElement;
+    if (target.scrollHeight - target.scrollTop <= target.clientHeight + 25) {
+      documentoLeido = true;
+    }
+  }
+
   function initPlayer() {
     if (!(window as any).YT || !anuncioActivo) return;
-    if (hasVideoBeenWatchedToday(anuncioActivo.id)) return;
 
-    ytPlayer = new (window as any).YT.Player('yt-video-frame', {
+    ytPlayer = new (window as any).YT.Player("yt-video-frame", {
       playerVars: {
         autoplay: 1,
         controls: 0,
@@ -107,25 +235,26 @@
             timeRemaining = Math.ceil(duration);
           }
           playerReady = true;
+          iniciarContador();
         },
         onStateChange: (event: any) => {
-          if (event.data === (window as any).YT.PlayerState.ENDED && !videoVisto) {
-            canClose = true;
-            videoVisto = true;
-            if (intervalId) {
-              clearInterval(intervalId);
+          if (event.data === (window as any).YT.PlayerState.PLAYING) {
+            const duration = event.target.getDuration();
+            if (duration > 0) {
+              totalTime = Math.ceil(duration);
+              timeRemaining = Math.ceil(duration);
             }
-            if (anuncioActivo) {
-              markVideoAsWatched(anuncioActivo.id);
-              registrarVista(anuncioActivo.id);
-              sessionStorage.removeItem('showWelcomeVideo');
-            }
-            setTimeout(() => {
-              showVideoModal = false;
-            }, 1000);
+            playerReady = true;
+            iniciarContador();
           }
-        }
-      }
+          if (
+            event.data === (window as any).YT.PlayerState.ENDED &&
+            !videoVisto
+          ) {
+            handleVideoTerminado();
+          }
+        },
+      },
     });
   }
 
@@ -160,7 +289,7 @@
   function formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   }
 
   currentDate = formatDate();
@@ -170,62 +299,62 @@
     dashboardStore.loadStats();
 
     if (skipVideo) {
-      sessionStorage.removeItem('showWelcomeVideo');
+      sessionStorage.removeItem("showWelcomeVideo");
       return;
     }
 
     getAnuncioActivo(tipoAnuncio).then(async (res) => {
-      if (!res.anuncio) return;
-      anuncioActivo = res.anuncio;
+      const todos = res.anuncios || (res.anuncio ? [res.anuncio] : []);
+      if (todos.length === 0) return;
 
-      if (hasVideoBeenWatchedToday(res.anuncio.id)) return;
-      if (sessionStorage.getItem('showWelcomeVideo') !== 'true') return;
-
+      const porVer: AnuncioDetalle[] = [];
       const today = getBogotaDate();
-      try {
-        const vistaRes = await getUltimaVista(res.anuncio.id);
-        if (vistaRes.success && vistaRes.ultima_vista) {
-          const ultimaVistaDate = String(vistaRes.ultima_vista).substring(0, 10);
-          if (ultimaVistaDate === today) {
-            markVideoAsWatched(res.anuncio.id);
-            sessionStorage.removeItem('showWelcomeVideo');
-            return;
+
+      for (const a of todos) {
+        let yaVisto = hasVideoBeenWatchedToday(a.id);
+        if (!yaVisto) {
+          try {
+            const vistaRes = await getUltimaVista(a.id);
+            if (vistaRes.success && vistaRes.ultima_vista) {
+              const ultimaVistaDate = String(vistaRes.ultima_vista).substring(
+                0,
+                10,
+              );
+              if (ultimaVistaDate === today) {
+                markVideoAsWatched(a.id);
+                yaVisto = true;
+              }
+            }
+          } catch (e) {
+            // fallback
           }
         }
-      } catch (e) {
-        // Si falla la consulta, permitir mostrar el video (fallback)
+        if (!yaVisto) {
+          porVer.push(a);
+        }
       }
+
+      if (porVer.length === 0) return;
+
+      listaAnunciosPendientes = porVer;
+      indiceAnuncioActual = 0;
+      anuncioActivo = listaAnunciosPendientes[0];
+
+      if (sessionStorage.getItem("showWelcomeVideo") !== "true") return;
 
       showVideoModal = true;
 
       loadYouTubeAPI().then(() => {
         setTimeout(() => initPlayer(), 500);
       });
-
-      intervalId = setInterval(() => {
-        if (timeRemaining > 0) {
-          timeRemaining--;
-        } else if (!videoVisto) {
-          canClose = true;
-          videoVisto = true;
-          if (intervalId) {
-            clearInterval(intervalId);
-          }
-          if (anuncioActivo) {
-            markVideoAsWatched(anuncioActivo.id);
-            registrarVista(anuncioActivo.id);
-            sessionStorage.removeItem('showWelcomeVideo');
-          }
-          setTimeout(() => {
-            showVideoModal = false;
-          }, 1000);
-        }
-      }, 1000);
     });
 
     return () => {
       if (intervalId) {
         clearInterval(intervalId);
+      }
+      if (lecturaTimer) {
+        clearTimeout(lecturaTimer);
       }
     };
   });
@@ -235,7 +364,7 @@
       if (anuncioActivo && !videoVisto) {
         markVideoAsWatched(anuncioActivo.id);
         await registrarVista(anuncioActivo.id);
-        sessionStorage.removeItem('showWelcomeVideo');
+        sessionStorage.removeItem("showWelcomeVideo");
       }
       showVideoModal = false;
       if (intervalId) {
@@ -436,7 +565,6 @@
           </div>
         </div>
       </a>
-
     </div>
   {:else}
     <div class="flex flex-col items-center justify-center py-20 gap-4">
@@ -453,70 +581,255 @@
   {/if}
 </div>
 
-<!-- Modal de Video -->
+<!-- Modal de Video / Documento -->
 {#if showVideoModal}
-  <div 
+  <div
     class="fixed inset-0 z-[9999] flex items-center justify-center bg-black"
     transition:fade={{ duration: 300 }}
   >
     <div class="w-full h-full flex flex-col">
       <!-- Header -->
-      <div class="bg-primario px-6 py-4 flex items-center justify-between flex-shrink-0">
+      <div
+        class="bg-primario px-6 py-4 flex items-center justify-between flex-shrink-0"
+      >
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div
+            class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"
+          >
+            <svg
+              class="w-6 h-6 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              {#if verDocumento}
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              {:else}
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              {/if}
             </svg>
           </div>
           <div>
-            <h2 class="font-display text-xl font-bold text-white">Mensaje Importante</h2>
-            <p class="text-xs text-white/80">Por favor, mira este video antes de continuar</p>
+            <h2 class="font-display text-xl font-bold text-white">
+              {#if verDocumento}
+                Visualizar Documento
+              {:else}
+                Mensaje Importante
+              {/if}
+            </h2>
+            <div class="flex items-center gap-1.5 mt-1">
+              {#each listaAnunciosPendientes as _, i}
+                <div
+                  class="w-2 h-2 rounded-full transition-all duration-300 {i ===
+                  indiceAnuncioActual
+                    ? 'bg-white scale-125'
+                    : i < indiceAnuncioActual
+                      ? 'bg-white/50'
+                      : 'bg-white/20'}"
+                ></div>
+              {/each}
+              <span class="text-xs text-white/85 ml-1.5 font-medium"
+                >Anuncio {indiceAnuncioActual + 1} de {listaAnunciosPendientes.length}</span
+              >
+            </div>
           </div>
         </div>
-        
-        {#if canClose}
-          <button
-            onclick={closeVideoModal}
-            aria-label="Cerrar video"
-            class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 active:scale-95 transition-all duration-200"
-          >
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        {:else}
-          <div class="px-4 py-2 bg-white/20 rounded-xl">
-            <p class="text-sm font-bold text-white">{formatTime(timeRemaining)}</p>
-          </div>
+
+        {#if !verDocumento}
+          {#if canClose}
+            <button
+              onclick={closeVideoModal}
+              aria-label="Cerrar video"
+              class="w-10 h-10 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 active:scale-95 transition-all duration-200"
+            >
+              <svg
+                class="w-5 h-5 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          {:else}
+            <div class="px-4 py-2 bg-white/20 rounded-xl">
+              <p class="text-sm font-bold text-white">
+                {formatTime(timeRemaining)}
+              </p>
+            </div>
+          {/if}
         {/if}
       </div>
 
-      <!-- Video -->
-      <div class="flex-1 bg-black flex items-center justify-center p-4 sm:p-6 md:p-8">
-        <div class="w-full h-full max-w-md max-h-[calc(100vh-200px)] flex items-center justify-center">
-          <iframe
-            id="yt-video-frame"
-            src={videoUrl}
-            title="Video importante"
-            frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            class="w-full h-full rounded-2xl pointer-events-none"
-            style="aspect-ratio: 9/16;"
-          ></iframe>
+      <!-- Contenido central (Video o Documento) -->
+      {#if verDocumento && anuncioActivo}
+        <div
+          bind:this={scrollContainer}
+          onscroll={handleScroll}
+          class="flex-1 bg-fondo-soft overflow-y-auto p-2 sm:p-6 flex flex-col items-center"
+        >
+          <div
+            class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-fondo-soft p-4 sm:p-6 flex flex-col items-center gap-4 sm:gap-6 my-2 sm:my-4"
+          >
+            <div class="text-center px-2">
+              <h3 class="text-lg sm:text-xl font-bold text-texto-dark font-display">
+                Documento Adjunto
+              </h3>
+              <p class="text-xs sm:text-sm text-texto-grey mt-1">
+                Por favor visualice el documento adjunto
+              </p>
+            </div>
+
+            <div
+              class="w-full bg-fondo-soft rounded-xl p-1 sm:p-2 flex items-center justify-center min-h-[50vh] sm:min-h-[75vh] relative"
+            >
+              {#if docLoading}
+                <div
+                  class="absolute inset-0 flex flex-col items-center justify-center bg-fondo-soft/80 z-10 gap-3"
+                >
+                  <div
+                    class="w-10 h-10 border-4 border-primario/30 border-t-primario rounded-full animate-spin"
+                  ></div>
+                  <p class="text-xs font-medium text-texto-grey">
+                    Cargando documento...
+                  </p>
+                </div>
+              {/if}
+
+              {#if isDocPdf}
+                <iframe
+                  src={anuncioActivo.documento_url}
+                  title="Documento PDF"
+                  onload={handleDocLoad}
+                  class="w-full h-[50vh] sm:h-[75vh] rounded-lg border border-fondo-soft bg-white"
+                ></iframe>
+              {:else}
+                <img
+                  src={anuncioActivo.documento_url}
+                  alt="Documento"
+                  onload={handleDocLoad}
+                  class="w-full rounded-lg shadow-sm bg-white object-contain max-h-[60vh] sm:max-h-[80vh]"
+                />
+              {/if}
+            </div>
+
+            <!-- Enlace alternativo para móviles si es PDF -->
+            {#if isDocPdf}
+              <div class="text-center sm:hidden -mt-2">
+                <a
+                  href={anuncioActivo.documento_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-xs font-semibold text-primario underline hover:text-primario-dark"
+                >
+                  ¿No puede visualizar el PDF? Abrir en pantalla completa
+                </a>
+              </div>
+            {/if}
+
+            <div
+              class="w-full border-t border-dashed border-fondo-soft pt-4 flex flex-col items-center gap-2"
+            >
+              <span
+                class="text-xs font-bold text-texto-grey uppercase tracking-wider"
+                >Fin del Documento</span
+              >
+              {#if docLoading}
+                <p class="text-xs text-texto-grey font-medium">Cargando...</p>
+              {:else if !tiempoLecturaCumplido}
+                <p class="text-xs text-amber-600 font-medium animate-pulse text-center">
+                  Por favor visualice el documento. Analizando lectura...
+                </p>
+              {:else if !documentoLeido}
+                <p class="text-xs text-amber-600 font-medium text-center">
+                  Por favor visualice el documento para poder continuar.
+                </p>
+              {:else}
+                <p class="text-xs text-green-600 font-bold text-center">
+                  Visualización completada.
+                </p>
+              {/if}
+            </div>
+          </div>
         </div>
-      </div>
+      {:else}
+        <!-- Video -->
+        <div
+          class="flex-1 bg-black flex items-center justify-center p-2 sm:p-6 md:p-8"
+        >
+          <div
+            class="w-full h-full max-w-md max-h-[calc(100vh-160px)] sm:max-h-[calc(100vh-200px)] flex items-center justify-center"
+          >
+            {#key anuncioActivo.id}
+              <iframe
+                id="yt-video-frame"
+                src={videoUrl}
+                title="Video importante"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                class="w-full h-full rounded-2xl pointer-events-none"
+                style="aspect-ratio: 9/16;"
+              ></iframe>
+            {/key}
+          </div>
+        </div>
+      {/if}
 
       <!-- Footer -->
       <div class="px-6 py-4 bg-primario/90 flex-shrink-0">
-        {#if !canClose}
+        {#if verDocumento}
+          <div class="text-center max-w-4xl mx-auto">
+            <button
+              onclick={irAlSiguienteAnuncioOFinalizar}
+              disabled={!documentoLeido || !tiempoLecturaCumplido || docLoading}
+              class="px-8 py-3 bg-white text-primario disabled:bg-white/40 disabled:text-primario/50 disabled:cursor-not-allowed rounded-xl text-sm font-bold hover:bg-white/90 hover:shadow-lg hover:-translate-y-0.5 active:scale-95 transition-all duration-200"
+            >
+              {#if docLoading}
+                Cargando documento...
+              {:else if !tiempoLecturaCumplido}
+                Visualice el documento (Espere...)
+              {:else if !documentoLeido}
+                Deslice hacia abajo para continuar
+              {:else if indiceAnuncioActual < listaAnunciosPendientes.length - 1}
+                Siguiente Video
+              {:else}
+                Continuar al Dashboard
+              {/if}
+            </button>
+          </div>
+        {:else if !canClose}
           <div class="max-w-4xl mx-auto">
             <div class="flex items-center gap-3 mb-3">
               <div class="flex-1">
-                <div class="w-full bg-white/20 rounded-full h-3 overflow-hidden">
-                  <div 
+                <div
+                  class="w-full bg-white/20 rounded-full h-3 overflow-hidden"
+                >
+                  <div
                     class="h-full bg-white transition-all duration-1000 ease-linear"
-                    style="width: {totalTime > 0 ? ((totalTime - timeRemaining) / totalTime) * 100 : 0}%"
+                    style="width: {totalTime > 0
+                      ? ((totalTime - timeRemaining) / totalTime) * 100
+                      : 0}%"
                   ></div>
                 </div>
               </div>
@@ -532,10 +845,10 @@
           <div class="text-center max-w-4xl mx-auto">
             <p class="text-sm font-bold text-white mb-3">✓ Video completado</p>
             <button
-              onclick={closeVideoModal}
+              onclick={handleVideoTerminado}
               class="px-8 py-3 bg-white text-primario rounded-xl text-sm font-bold hover:bg-white/90 hover:shadow-lg hover:-translate-y-0.5 active:scale-95 transition-all duration-200"
             >
-              Continuar al Dashboard
+              Continuar
             </button>
           </div>
         {/if}

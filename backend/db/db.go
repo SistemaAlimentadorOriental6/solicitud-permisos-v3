@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	_ "github.com/microsoft/go-mssqldb"
@@ -84,6 +85,26 @@ func initMySQLDB(cfg config.DatabaseConfig) (*sql.DB, error) {
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}
+
+	// Asegurar que la tabla de historial exista
+	_, err = db.ExecContext(ctx, `
+		CREATE TABLE IF NOT EXISTS anuncios_historial_activo (
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			anuncio_id INT NOT NULL,
+			fecha_inicio DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			fecha_fin DATETIME DEFAULT NULL,
+			INDEX idx_anuncio_id (anuncio_id),
+			CONSTRAINT fk_historial_anuncio FOREIGN KEY (anuncio_id)
+				REFERENCES anuncios_video(id) ON DELETE CASCADE
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+	`)
+	if err != nil {
+		log.Printf("Advertencia: No se pudo verificar/crear la tabla de historial: %v", err)
+	}
+
+	// Asegurar columna documento_url en anuncios_video
+	_, _ = db.ExecContext(ctx, "ALTER TABLE anuncios_video ADD COLUMN documento_url VARCHAR(500) DEFAULT NULL")
+	_, _ = db.ExecContext(ctx, "ALTER TABLE anuncios_video ADD COLUMN documento_activo TINYINT DEFAULT 1")
 
 	return db, nil
 }
