@@ -1,10 +1,10 @@
 import type { User } from '../types/auth.types';
 
-export const CODIGOS_ADMIN = ['9999', '0000', '1303', '0101', '7654'] as const;
+export const CODIGOS_ADMIN = ['9999', '0000', '1303', '0101', '7654', '8246'] as const;
 
-export const AREAS_ADMIN = ['se_operaciones', 'se_mantenimiento', 'se_comunicaciones'] as const;
+export const AREAS_ADMIN = ['se_operaciones', 'se_mantenimiento', 'se_comunicaciones', 'se_via_vigilantes'] as const;
 
-export type AreaSolicitud = 'operaciones' | 'mantenimiento';
+export type AreaSolicitud = 'operaciones' | 'mantenimiento' | 'via-vigilantes';
 
 export function esAdmin(usuario: User | null | undefined): boolean {
   if (!usuario) return false;
@@ -17,6 +17,7 @@ export function obtenerAreaForzada(usuario: User | null | undefined): AreaSolici
   const area = usuario.area.toLowerCase().trim();
   if (area === 'se_operaciones' || area === 'operaciones') return 'operaciones';
   if (area === 'se_mantenimiento' || area === 'mantenimiento') return 'mantenimiento';
+  if (area === 'se_via_vigilantes' || area === 'via-vigilantes') return 'via-vigilantes';
   return null;
 }
 

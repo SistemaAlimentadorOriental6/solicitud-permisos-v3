@@ -33,6 +33,7 @@ export interface SolicitudesPendientesResponse {
   total: number;
   operaciones: number;
   mantenimiento: number;
+  via_vigilantes?: number;
   solicitudes: Solicitud[];
 }
 
@@ -53,7 +54,7 @@ export async function getSolicitudes(): Promise<SolicitudesResponse> {
   return data;
 }
 
-export async function getSolicitudesPendientes(area?: 'operaciones' | 'mantenimiento'): Promise<SolicitudesPendientesResponse> {
+export async function getSolicitudesPendientes(area?: 'operaciones' | 'mantenimiento' | 'via-vigilantes'): Promise<SolicitudesPendientesResponse> {
   const token = localStorage.getItem('token');
   const url = area
     ? `${API_BASE_URL}/api/solicitudes/pendientes?area=${area}`
@@ -82,10 +83,11 @@ export interface SolicitudesAllResponse {
   pendientes: number;
   operaciones: number;
   mantenimiento: number;
+  via_vigilantes?: number;
   solicitudes: Solicitud[];
 }
 
-export async function getAllSolicitudes(area?: 'operaciones' | 'mantenimiento'): Promise<SolicitudesAllResponse> {
+export async function getAllSolicitudes(area?: 'operaciones' | 'mantenimiento' | 'via-vigilantes'): Promise<SolicitudesAllResponse> {
   const token = localStorage.getItem('token');
   const url = area
     ? `${API_BASE_URL}/api/solicitudes/todas?area=${area}`
@@ -167,7 +169,7 @@ export interface SolicitudesRecientesResponse {
   solicitudes: Solicitud[];
 }
 
-export async function getSolicitudesRecientes(area?: 'operaciones' | 'mantenimiento'): Promise<SolicitudesRecientesResponse> {
+export async function getSolicitudesRecientes(area?: 'operaciones' | 'mantenimiento' | 'via-vigilantes'): Promise<SolicitudesRecientesResponse> {
   const token = localStorage.getItem('token');
   const url = area
     ? `${API_BASE_URL}/api/solicitudes/recientes?area=${area}`

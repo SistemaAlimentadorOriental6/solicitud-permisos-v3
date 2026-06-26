@@ -68,7 +68,7 @@
           fechaApertura: cerrarFechaApertura
         };
         showCerrarForm = false;
-        message = { type: 'success', text: `Solicitudes de ${currentArea === 'operaciones' ? 'Operaciones' : 'Mantenimiento'} cerradas correctamente.` };
+        message = { type: 'success', text: `Solicitudes de ${formatAreaName(currentArea)} cerradas correctamente.` };
       } else {
         message = { type: 'error', text: res.message || 'Error al guardar cierre' };
       }
@@ -89,7 +89,7 @@
       if (res.success) {
         cierreConfig = null;
         showAbrirModal = false;
-        message = { type: 'success', text: `Solicitudes de ${currentArea === 'operaciones' ? 'Operaciones' : 'Mantenimiento'} abiertas de nuevo.` };
+        message = { type: 'success', text: `Solicitudes de ${formatAreaName(currentArea)} abiertas de nuevo.` };
       } else {
         message = { type: 'error', text: res.message || 'Error al abrir solicitudes' };
       }
@@ -131,7 +131,14 @@
   const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   const DIAS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const AREAS = ['operaciones', 'mantenimiento'] as const;
+  function formatAreaName(areaName: string): string {
+    if (areaName === 'operaciones') return 'Operaciones';
+    if (areaName === 'mantenimiento') return 'Mantenimiento';
+    if (areaName === 'via-vigilantes') return 'Vía-Vigilantes';
+    return areaName;
+  }
+
+  const AREAS = ['operaciones', 'mantenimiento', 'via-vigilantes'] as const;
   type Area = (typeof AREAS)[number];
 
   let areaForzada = $derived(obtenerAreaForzada($currentUser));
@@ -184,12 +191,15 @@
   }
 
   function formatDateInfo(date: Date, isDefault: boolean = false): DateInfo {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
     return {
-      dateStr: date.toISOString().split('T')[0],
+      dateStr: `${y}-${m}-${d}`,
       dayName: DIAS[date.getDay()],
       dayNumber: String(date.getDate()),
       monthName: MESES[date.getMonth()],
-      year: String(date.getFullYear()),
+      year: String(y),
       isDefault,
       isHoliday: isHoliday(date),
     };
@@ -274,15 +284,11 @@
   }
 
   function getMonthDays(year: number, month: number): (DateInfo | null)[][] {
-    const firstDay = new Date(year, month, 1);
+    const firstDay = new Date(year, month, 1, 12, 0, 0);
     const startDow = firstDay.getDay();
     
     const weeks: (DateInfo | null)[][] = [];
-    let current = new Date(year, month, 1);
-    
-    for (let i = 0; i < startDow; i++) {
-      current = new Date(year, month, 1 - startDow + i);
-    }
+    let current = new Date(year, month, 1 - startDow, 12, 0, 0);
     
     while (weeks.length < 6) {
       const week: (DateInfo | null)[] = [];
@@ -458,7 +464,7 @@
             ? 'bg-white text-primario shadow-sm'
             : 'text-texto-grey hover:text-texto-dark'}"
       >
-        {area === 'operaciones' ? 'Operaciones' : 'Mantenimiento'}
+        {formatAreaName(area)}
       </button>
     {/each}
   </div>
@@ -466,7 +472,7 @@
   <div class="mb-6">
     <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-fondo-soft rounded-lg text-xs font-bold text-texto-grey uppercase tracking-wider">
       <span class="w-2 h-2 rounded-full bg-primario"></span>
-      {currentArea === 'operaciones' ? 'Operaciones' : 'Mantenimiento'}
+      {formatAreaName(currentArea)}
     </span>
   </div>
   {/if}
@@ -481,7 +487,7 @@
             </svg>
           </div>
           <div>
-            <p class="text-xs font-semibold text-texto-grey uppercase tracking-wider">Solicitudes cerradas ({currentArea === 'operaciones' ? 'Operaciones' : 'Mantenimiento'})</p>
+            <p class="text-xs font-semibold text-texto-grey uppercase tracking-wider">Solicitudes cerradas ({formatAreaName(currentArea)})</p>
             <p class="text-sm font-bold text-texto-dark">{cierreConfig.titulo}</p>
             {#if cierreConfig.fechaApertura}
               <p class="text-xs text-texto-grey mt-0.5">Reapertura: {formatFechaApertura(cierreConfig.fechaApertura)}</p>

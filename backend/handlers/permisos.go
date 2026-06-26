@@ -30,6 +30,18 @@ var (
 		"Día P.M.",
 	}
 
+	viaVigilantesTipos = []string{
+		"Descanso",
+		"Licencia no remunerada",
+		"Cita médica",
+		"Tabla Partida",
+		"Día A.M.",
+		"Día P.M.",
+		"Cumpleaños",
+		"Vacaciones",
+		"Permiso para estudiar",
+	}
+
 	mantenimientoTipos = []string{
 		"Cumpleaños",
 		"Cita médica",
@@ -149,6 +161,8 @@ func CreatePermiso(c *fiber.Ctx) error {
 	validTipos := operacionesTipos
 	if claims.Area == "Mantenimiento" {
 		validTipos = mantenimientoTipos
+	} else if claims.Area == "Via-Vigilantes" {
+		validTipos = viaVigilantesTipos
 	}
 
 	valid, msg = validateTipoNovedad(tipoNovedad, validTipos)
@@ -247,6 +261,8 @@ func CreatePermiso(c *fiber.Ctx) error {
 	tipoUsuario := "se_operaciones"
 	if claims.Area == "Mantenimiento" {
 		tipoUsuario = "se_mantenimiento"
+	} else if claims.Area == "Via-Vigilantes" {
+		tipoUsuario = "se_via_vigilantes"
 	}
 
 	dbInstance := db.GetSolicitudPermisosDB()
@@ -357,7 +373,12 @@ func validateOperador(codeOrCedula, area string) (bool, string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	query := `SELECT COUNT(*) FROM SE_W0550 WHERE RTRIM(f_nit_empl) = @cedula AND f_desc_ccosto IN ('Gestion de Mantenimiento', 'Tecnicos de Mantenimiento')`
+	var query string
+	if area == "Via-Vigilantes" {
+		query = `SELECT COUNT(*) FROM SE_W0550 WHERE RTRIM(f_nit_empl) = @cedula AND RTRIM(f_desc_cargo) IN ('AUXILIAR DE INTEGRACION', 'REGULADOR VIA', 'AUXILIAR DE FLOTA', 'AUXILIAR LOGISTICO')`
+	} else {
+		query = `SELECT COUNT(*) FROM SE_W0550 WHERE RTRIM(f_nit_empl) = @cedula AND f_desc_ccosto IN ('Gestion de Mantenimiento', 'Tecnicos de Mantenimiento')`
+	}
 
 	var count int
 	err := db.QueryRowContext(ctx, query, sql.Named("cedula", codeOrCedula)).Scan(&count)
@@ -461,6 +482,8 @@ func CreateExtemporaneo(c *fiber.Ctx) error {
 	tipoUsuario := "se_operaciones"
 	if areaEmpleado == "Mantenimiento" {
 		tipoUsuario = "se_mantenimiento"
+	} else if areaEmpleado == "Via-Vigilantes" {
+		tipoUsuario = "se_via_vigilantes"
 	}
 
 	dbInstance := db.GetSolicitudPermisosDB()
@@ -507,16 +530,20 @@ func resolveEmpleado(identificador string) (codigo string, area string, err erro
 		return identificador, "Operaciones", nil
 	}
 
-	// Try by cedula (Mantenimiento)
+	// Try by cedula (Mantenimiento or Via-Vigilantes)
 	dbInstance := db.GetUnoEEDB()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	query := `SELECT TOP 1 RTRIM(f_nit_empl), f_desc_ccosto FROM SE_W0550 WHERE RTRIM(f_nit_empl) = @cedula`
+	query := `SELECT TOP 1 RTRIM(f_nit_empl), f_desc_ccosto, RTRIM(f_desc_cargo) FROM SE_W0550 WHERE RTRIM(f_nit_empl) = @cedula ORDER BY f_ndc DESC`
 
-	var cedula, areaEmpleado string
-	queryErr := dbInstance.QueryRowContext(ctx, query, sql.Named("cedula", identificador)).Scan(&cedula, &areaEmpleado)
+	var cedula, areaEmpleado, cargo string
+	queryErr := dbInstance.QueryRowContext(ctx, query, sql.Named("cedula", identificador)).Scan(&cedula, &areaEmpleado, &cargo)
 	if queryErr == nil && cedula != "" {
+		cargoUpper := strings.ToUpper(strings.TrimSpace(cargo))
+		if cargoUpper == "AUXILIAR DE INTEGRACION" || cargoUpper == "REGULADOR VIA" || cargoUpper == "AUXILIAR DE FLOTA" || cargoUpper == "AUXILIAR LOGISTICO" {
+			return cedula, "Via-Vigilantes", nil
+		}
 		if strings.Contains(strings.ToLower(areaEmpleado), "mantenimiento") {
 			return cedula, "Mantenimiento", nil
 		}

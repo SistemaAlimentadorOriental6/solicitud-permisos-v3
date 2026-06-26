@@ -200,7 +200,7 @@ func CrearAnuncio(c *fiber.Ctx) error {
 	retURL := ""
 	docTipo := ""
 	if documentoURL != "" {
-		retURL = fmt.Sprintf("%s/public/anuncios/%d/documento", c.BaseURL(), id)
+		retURL = fmt.Sprintf("%s/api/public/anuncios/%d/documento", c.BaseURL(), id)
 		if strings.HasSuffix(strings.ToLower(documentoURL), ".pdf") {
 			docTipo = "pdf"
 		} else {
@@ -227,6 +227,21 @@ func CrearAnuncio(c *fiber.Ctx) error {
 }
 
 func GetAnuncioActivo(c *fiber.Ctx) error {
+	var claims *utils.Claims
+	if userVal := c.Locals("user"); userVal != nil {
+		if u, ok := userVal.(*utils.Claims); ok {
+			claims = u
+		}
+	}
+
+	if claims != nil && claims.Area == "Via-Vigilantes" {
+		return c.JSON(fiber.Map{
+			"success":  true,
+			"anuncios": []interface{}{},
+			"anuncio":  nil,
+		})
+	}
+
 	mysqlDB := db.GetSolicitudPermisosDB()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -263,7 +278,7 @@ func GetAnuncioActivo(c *fiber.Ctx) error {
 		a.Activo = activo == 1
 		a.DocumentoActivo = docActivo == 1
 		if docURL.String != "" {
-			a.DocumentoUrl = fmt.Sprintf("%s/public/anuncios/%d/documento", c.BaseURL(), a.ID)
+			a.DocumentoUrl = fmt.Sprintf("%s/api/public/anuncios/%d/documento", c.BaseURL(), a.ID)
 			if strings.HasSuffix(strings.ToLower(docURL.String), ".pdf") {
 				a.DocumentoTipo = "pdf"
 			} else {
@@ -327,7 +342,7 @@ func ListarAnuncios(c *fiber.Ctx) error {
 		a.Activo = activo == 1
 		a.FechaCreacion = fechaCreacion.Format("02/01/2006 15:04")
 		if docURL.String != "" {
-			a.DocumentoUrl = fmt.Sprintf("%s/public/anuncios/%d/documento", c.BaseURL(), a.ID)
+			a.DocumentoUrl = fmt.Sprintf("%s/api/public/anuncios/%d/documento", c.BaseURL(), a.ID)
 			if strings.HasSuffix(strings.ToLower(docURL.String), ".pdf") {
 				a.DocumentoTipo = "pdf"
 			} else {
@@ -792,7 +807,7 @@ func SubirDocumentoAnuncio(c *fiber.Ctx) error {
 	retURL := ""
 	docTipo := ""
 	if documentoURL != "" {
-		retURL = fmt.Sprintf("%s/public/anuncios/%s/documento", c.BaseURL(), id)
+		retURL = fmt.Sprintf("%s/api/public/anuncios/%s/documento", c.BaseURL(), id)
 		if strings.HasSuffix(strings.ToLower(documentoURL), ".pdf") {
 			docTipo = "pdf"
 		} else {

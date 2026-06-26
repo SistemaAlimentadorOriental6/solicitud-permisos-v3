@@ -38,8 +38,11 @@ func normalizeArea(area string) string {
 	if area == "" {
 		return defaultArea
 	}
-	if area == "operaciones" || area == "mantenimiento" {
+	if area == "operaciones" || area == "mantenimiento" || area == "via-vigilantes" {
 		return area
+	}
+	if area == "via_vigilantes" || area == "se_via_vigilantes" {
+		return "via-vigilantes"
 	}
 	return defaultArea
 }
@@ -166,6 +169,9 @@ func loadAllSwitchConfigs() {
 	}
 	if _, ok := areaConfigs["mantenimiento"]; !ok {
 		areaConfigs["mantenimiento"] = switchConfig{diaNum: 3, hora: "12:00"}
+	}
+	if _, ok := areaConfigs["via-vigilantes"]; !ok {
+		areaConfigs["via-vigilantes"] = switchConfig{diaNum: 3, hora: "12:00"}
 	}
 	switchCfgInit = true
 }

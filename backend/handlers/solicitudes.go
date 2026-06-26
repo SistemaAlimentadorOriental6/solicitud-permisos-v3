@@ -180,6 +180,8 @@ func GetSemanaSolicitudes(c *fiber.Ctx) error {
 			areaFilter = ` AND tipo_usuario = 'se_operaciones'`
 		} else if area == "mantenimiento" {
 			areaFilter = ` AND tipo_usuario = 'se_mantenimiento'`
+		} else if area == "via-vigilantes" {
+			areaFilter = ` AND tipo_usuario = 'se_via_vigilantes'`
 		}
 
 		rows, err := mysqlDB.QueryContext(ctx,
@@ -285,6 +287,8 @@ func GetSolicitudesRecientes(c *fiber.Ctx) error {
 		query += ` AND tipo_usuario = 'se_operaciones'`
 	} else if area == "mantenimiento" {
 		query += ` AND tipo_usuario = 'se_mantenimiento'`
+	} else if area == "via-vigilantes" {
+		query += ` AND tipo_usuario = 'se_via_vigilantes'`
 	}
 
 	query += ` ORDER BY fecha_gestion DESC`
@@ -428,6 +432,8 @@ func GetStatsGeneral(c *fiber.Ctx) error {
 		query += ` WHERE tipo_usuario = 'se_operaciones'`
 	} else if area == "mantenimiento" {
 		query += ` WHERE tipo_usuario = 'se_mantenimiento'`
+	} else if area == "via-vigilantes" {
+		query += ` WHERE tipo_usuario = 'se_via_vigilantes'`
 	}
 
 	var total, aprobadas, rechazadas, pendientes int

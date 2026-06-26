@@ -15,6 +15,7 @@ interface SolicitudesState {
     total: number;
     operaciones: number;
     mantenimiento: number;
+    via_vigilantes?: number;
   };
   todas: Solicitud[];
   todasStats: {
@@ -24,6 +25,7 @@ interface SolicitudesState {
     pendientes: number;
     operaciones: number;
     mantenimiento: number;
+    via_vigilantes?: number;
   };
   recientes: Solicitud[];
   recientesStats: {
@@ -45,9 +47,9 @@ const initialState: SolicitudesState = {
   solicitudes: [],
   stats: { total: 0, aprobadas: 0, rechazadas: 0, pendientes: 0 },
   pendientes: [],
-  pendientesStats: { total: 0, operaciones: 0, mantenimiento: 0 },
+  pendientesStats: { total: 0, operaciones: 0, mantenimiento: 0, via_vigilantes: 0 },
   todas: [],
-  todasStats: { total: 0, aprobadas: 0, rechazadas: 0, pendientes: 0, operaciones: 0, mantenimiento: 0 },
+  todasStats: { total: 0, aprobadas: 0, rechazadas: 0, pendientes: 0, operaciones: 0, mantenimiento: 0, via_vigilantes: 0 },
   recientes: [],
   recientesStats: { total: 0, aprobadas: 0, rechazadas: 0 },
   isLoading: false,
@@ -93,7 +95,7 @@ function createSolicitudesStore() {
       }
     },
 
-    async fetchSolicitudesPendientes(area?: 'operaciones' | 'mantenimiento') {
+    async fetchSolicitudesPendientes(area?: 'operaciones' | 'mantenimiento' | 'via-vigilantes') {
       update((state) => ({ ...state, isLoadingPendientes: true, errorPendientes: null }));
 
       try {
@@ -106,6 +108,7 @@ function createSolicitudesStore() {
             total: data.total,
             operaciones: data.operaciones,
             mantenimiento: data.mantenimiento,
+            via_vigilantes: data.via_vigilantes || 0,
           },
           isLoadingPendientes: false,
           errorPendientes: null,
@@ -119,7 +122,7 @@ function createSolicitudesStore() {
       }
     },
 
-    async fetchSolicitudesTodas(area?: 'operaciones' | 'mantenimiento') {
+    async fetchSolicitudesTodas(area?: 'operaciones' | 'mantenimiento' | 'via-vigilantes') {
       update((state) => ({ ...state, isLoadingTodas: true, errorTodas: null }));
 
       try {
@@ -135,6 +138,7 @@ function createSolicitudesStore() {
             pendientes: data.pendientes,
             operaciones: data.operaciones,
             mantenimiento: data.mantenimiento,
+            via_vigilantes: data.via_vigilantes || 0,
           },
           isLoadingTodas: false,
           errorTodas: null,
@@ -148,7 +152,7 @@ function createSolicitudesStore() {
       }
     },
 
-    async fetchSolicitudesRecientes(area?: 'operaciones' | 'mantenimiento') {
+    async fetchSolicitudesRecientes(area?: 'operaciones' | 'mantenimiento' | 'via-vigilantes') {
       update((state) => ({ ...state, isLoadingRecientes: true, errorRecientes: null }));
 
       try {

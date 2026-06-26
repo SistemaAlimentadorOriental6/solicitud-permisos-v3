@@ -65,7 +65,7 @@ func main() {
 
 	auth := app.Group("/api/auth")
 	auth.Post("/login", handlers.Login)
-	app.Get("/public/anuncios/:id/documento", handlers.GetDocumentoAnuncio)
+	app.Get("/api/public/anuncios/:id/documento", handlers.GetDocumentoAnuncio)
 
 	app.Use("/api", middleware.JWTAuth())
 	app.Get("/api/me", handlers.Me)

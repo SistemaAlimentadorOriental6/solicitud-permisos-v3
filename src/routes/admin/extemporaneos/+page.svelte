@@ -87,12 +87,16 @@
       } else if (areaForzada === 'operaciones') {
         const ops = await getEmpleados('operaciones');
         empleadosCargados = ops.empleados;
+      } else if (areaForzada === 'via-vigilantes') {
+        const via = await getEmpleados('via-vigilantes');
+        empleadosCargados = via.empleados;
       } else {
-        const [ops, mant] = await Promise.all([
+        const [ops, mant, via] = await Promise.all([
           getEmpleados('operaciones'),
           getEmpleados('mantenimiento'),
+          getEmpleados('via-vigilantes'),
         ]);
-        empleadosCargados = [...ops.empleados, ...mant.empleados];
+        empleadosCargados = [...ops.empleados, ...mant.empleados, ...via.empleados];
       }
     } catch (e) {
       toast.error('Error al cargar empleados');

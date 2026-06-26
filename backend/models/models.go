@@ -130,6 +130,7 @@ type SolicitudesPendientesResponse struct {
 	Total         int                `json:"total"`
 	Operaciones   int                `json:"operaciones"`
 	Mantenimiento int                `json:"mantenimiento"`
+	ViaVigilantes int                `json:"via_vigilantes"`
 	Solicitudes   []SolicitudDetalle `json:"solicitudes"`
 }
 

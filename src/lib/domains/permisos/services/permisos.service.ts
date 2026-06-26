@@ -120,7 +120,7 @@ export interface EmpleadosResponse {
   empleados: EmpleadoDetalle[];
 }
 
-export async function getEmpleados(area: 'operaciones' | 'mantenimiento'): Promise<EmpleadosResponse> {
+export async function getEmpleados(area: 'operaciones' | 'mantenimiento' | 'via-vigilantes'): Promise<EmpleadosResponse> {
   const token = localStorage.getItem('token');
 
   const response = await fetch(`${API_BASE_URL}/api/empleados?area=${area}`, {

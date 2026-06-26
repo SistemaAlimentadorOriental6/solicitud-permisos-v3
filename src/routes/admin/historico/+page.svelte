@@ -11,7 +11,7 @@
   let puedeVerTodas = $derived(areaForzada === null);
 
   let searchQuery = $state('');
-  let areaFilter = $state<'todas' | 'operaciones' | 'mantenimiento'>('todas');
+  let areaFilter = $state<'todas' | 'operaciones' | 'mantenimiento' | 'via-vigilantes'>('todas');
   let estadoFilter = $state<'todas' | 'Pendiente' | 'Aceptada' | 'Rechazada'>('todas');
   let fechaInicio = $state('');
   let fechaFin = $state('');
@@ -27,7 +27,7 @@
     solicitudesStore.fetchSolicitudesTodas(area ?? undefined);
   }
 
-  function changeArea(newArea: 'todas' | 'operaciones' | 'mantenimiento') {
+  function changeArea(newArea: 'todas' | 'operaciones' | 'mantenimiento' | 'via-vigilantes') {
     if (areaForzada) return;
     areaFilter = newArea;
     loadData();
@@ -398,6 +398,12 @@
           >
             Mantenimiento
           </button>
+          <button 
+            onclick={() => changeArea('via-vigilantes')}
+            class="px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 {areaFilter === 'via-vigilantes' ? 'text-emerald-600 bg-emerald-50' : 'text-texto-grey hover:bg-fondo-soft'}"
+          >
+            Vía-Vigilantes
+          </button>
         {:else if areaForzada === 'operaciones'}
           <div class="px-4 py-2 rounded-xl text-xs font-bold text-blue-600 bg-blue-50">
             Operaciones
@@ -405,6 +411,10 @@
         {:else if areaForzada === 'mantenimiento'}
           <div class="px-4 py-2 rounded-xl text-xs font-bold text-purple-600 bg-purple-50">
             Mantenimiento
+          </div>
+        {:else if areaForzada === 'via-vigilantes'}
+          <div class="px-4 py-2 rounded-xl text-xs font-bold text-emerald-600 bg-emerald-50">
+            Vía-Vigilantes
           </div>
         {/if}
       </div>

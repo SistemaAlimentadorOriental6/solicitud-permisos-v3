@@ -79,7 +79,7 @@
   let areaForzada = $derived(obtenerAreaForzada($currentUser));
   let puedeVerTodas = $derived(areaForzada === null);
 
-  let areaFilter = $state<"todas" | "operaciones" | "mantenimiento">("todas");
+  let areaFilter = $state<"todas" | "operaciones" | "mantenimiento" | "via-vigilantes">("todas");
   let activeTab = $state<"permisos" | "recientes">("permisos");
   let cambiandoEstadoId = $state<number | null>(null);
 
@@ -155,7 +155,7 @@
   }
 
   function changeAreaFilter(
-    newArea: "todas" | "operaciones" | "mantenimiento",
+    newArea: "todas" | "operaciones" | "mantenimiento" | "via-vigilantes",
   ) {
     if (areaForzada) return;
     areaFilter = newArea;
@@ -491,13 +491,17 @@
       <p class="font-display text-3xl font-extrabold text-texto-dark">
         {$solicitudesPendientesStats.total ?? 0}
       </p>
-      <div class="flex gap-2 mt-2 text-[10px]">
+      <div class="flex gap-2 mt-2 text-[10px] flex-wrap">
         <span class="text-blue-500 font-semibold"
           >Op: {$solicitudesPendientesStats.operaciones ?? 0}</span
         >
         <span class="text-texto-grey">|</span>
         <span class="text-purple-500 font-semibold"
           >Mant: {$solicitudesPendientesStats.mantenimiento ?? 0}</span
+        >
+        <span class="text-texto-grey">|</span>
+        <span class="text-emerald-600 font-semibold"
+          >Vía: {$solicitudesPendientesStats.via_vigilantes ?? 0}</span
         >
       </div>
     </div>
@@ -913,6 +917,15 @@
           >
             Mantenimiento ({$solicitudesPendientesStats.mantenimiento ?? 0})
           </button>
+          <button
+            onclick={() => changeAreaFilter("via-vigilantes")}
+            class="px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 {areaFilter ===
+            'via-vigilantes'
+              ? 'text-emerald-600 bg-emerald-50'
+              : 'text-texto-grey hover:bg-fondo-soft'}"
+          >
+            Vía-Vigilantes ({$solicitudesPendientesStats.via_vigilantes ?? 0})
+          </button>
         {:else if areaForzada === "operaciones"}
           <div
             class="px-4 py-2 rounded-xl text-xs font-bold text-blue-600 bg-blue-50"
@@ -924,6 +937,12 @@
             class="px-4 py-2 rounded-xl text-xs font-bold text-purple-600 bg-purple-50"
           >
             Mantenimiento ({$solicitudesPendientesStats.mantenimiento ?? 0})
+          </div>
+        {:else if areaForzada === "via-vigilantes"}
+          <div
+            class="px-4 py-2 rounded-xl text-xs font-bold text-emerald-600 bg-emerald-50"
+          >
+            Vía-Vigilantes ({$solicitudesPendientesStats.via_vigilantes ?? 0})
           </div>
         {/if}
       </div>

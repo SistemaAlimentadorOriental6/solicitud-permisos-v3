@@ -34,6 +34,74 @@
   let docLoading = $state(false);
   let tiempoLecturaCumplido = $state(false);
   let lecturaTimer: ReturnType<typeof setTimeout> | null = null;
+  let tiempoLecturaRestante = $state(30);
+  let lecturaInterval: ReturnType<typeof setInterval> | null = null;
+
+  let numPages = $state(0);
+  let canvasElements = $state<HTMLCanvasElement[]>([]);
+
+  async function loadAndRenderPdf(url: string) {
+    if (typeof window === "undefined") return;
+
+    // Esperar a que la biblioteca esté cargada en window
+    let retries = 0;
+    while (!(window as any).pdfjsLib && retries < 20) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      retries++;
+    }
+
+    const pdfjsLib = (window as any).pdfjsLib;
+    if (!pdfjsLib) {
+      console.error("PDF.js no se pudo cargar");
+      docLoading = false;
+      return;
+    }
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+    try {
+      docLoading = true;
+      numPages = 0;
+      canvasElements = [];
+
+      const loadingTask = pdfjsLib.getDocument(url);
+      const pdf = await loadingTask.promise;
+      numPages = pdf.numPages;
+
+      // Esperar a que Svelte cree los elementos canvas en el DOM
+      setTimeout(async () => {
+        try {
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const canvas = canvasElements[pageNum - 1];
+            if (!canvas) continue;
+
+            const context = canvas.getContext("2d");
+            if (!context) continue;
+
+            // Determinar escala adecuada
+            const viewport = page.getViewport({ scale: 1.5 });
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            const renderContext = {
+              canvasContext: context,
+              viewport: viewport,
+            };
+            await page.render(renderContext).promise;
+          }
+          handleDocLoad();
+        } catch (err) {
+          console.error("Error al renderizar páginas de PDF:", err);
+          docLoading = false;
+        }
+      }, 200);
+    } catch (error) {
+      console.error("Error al cargar PDF con pdf.js:", error);
+      docLoading = false;
+    }
+  }
 
   const skipVideo = $derived($page.url.searchParams.get("video") === "false");
   const esMantenimiento = $derived(
@@ -43,6 +111,30 @@
     esMantenimiento ? "mantenimiento" : "operaciones",
   );
   const isDocPdf = $derived(anuncioActivo?.documento_tipo === "pdf");
+
+  $effect(() => {
+    if (verDocumento && safeDocumentoUrl && isDocPdf) {
+      loadAndRenderPdf(safeDocumentoUrl);
+    }
+  });
+  const safeDocumentoUrl = $derived.by(() => {
+    let url = anuncioActivo?.documento_url || "";
+    if (!url) return "";
+    if (
+      typeof window !== "undefined" &&
+      window.location.protocol === "https:" &&
+      url.startsWith("http:")
+    ) {
+      url = url.replace("http:", "https:");
+    }
+    if (
+      url.includes("/api/public/anuncios/") &&
+      !url.includes("/api/api/public/anuncios/")
+    ) {
+      url = url.replace("/api/public/anuncios/", "/api/api/public/anuncios/");
+    }
+    return url;
+  });
 
   function getBogotaDate(): string {
     const now = new Date();
@@ -146,10 +238,23 @@
   function handleDocLoad() {
     docLoading = false;
     tiempoLecturaCumplido = false;
+    tiempoLecturaRestante = 30;
+
     if (lecturaTimer) clearTimeout(lecturaTimer);
+    if (lecturaInterval) clearInterval(lecturaInterval);
+
+    lecturaInterval = window.setInterval(() => {
+      if (tiempoLecturaRestante > 0) {
+        tiempoLecturaRestante--;
+      } else {
+        if (lecturaInterval) clearInterval(lecturaInterval);
+      }
+    }, 1000);
+
     lecturaTimer = setTimeout(() => {
       tiempoLecturaCumplido = true;
-    }, 8000); // 8 segundos obligatorios de lectura
+      if (lecturaInterval) clearInterval(lecturaInterval);
+    }, 30000); // 30 segundos obligatorios de lectura
 
     setTimeout(() => {
       if (
@@ -169,6 +274,10 @@
     if (lecturaTimer) {
       clearTimeout(lecturaTimer);
       lecturaTimer = null;
+    }
+    if (lecturaInterval) {
+      clearInterval(lecturaInterval);
+      lecturaInterval = null;
     }
 
     if (indiceAnuncioActual < listaAnunciosPendientes.length - 1) {
@@ -356,6 +465,9 @@
       if (lecturaTimer) {
         clearTimeout(lecturaTimer);
       }
+      if (lecturaInterval) {
+        clearInterval(lecturaInterval);
+      }
     };
   });
 
@@ -373,6 +485,12 @@
     }
   }
 </script>
+
+<svelte:head>
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+  ></script>
+</svelte:head>
 
 <div class="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl mx-auto">
   {#if $dashboardLoading}
@@ -693,7 +811,9 @@
             class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-fondo-soft p-4 sm:p-6 flex flex-col items-center gap-4 sm:gap-6 my-2 sm:my-4"
           >
             <div class="text-center px-2">
-              <h3 class="text-lg sm:text-xl font-bold text-texto-dark font-display">
+              <h3
+                class="text-lg sm:text-xl font-bold text-texto-dark font-display"
+              >
                 Documento Adjunto
               </h3>
               <p class="text-xs sm:text-sm text-texto-grey mt-1">
@@ -718,15 +838,17 @@
               {/if}
 
               {#if isDocPdf}
-                <iframe
-                  src={anuncioActivo.documento_url}
-                  title="Documento PDF"
-                  onload={handleDocLoad}
-                  class="w-full h-[50vh] sm:h-[75vh] rounded-lg border border-fondo-soft bg-white"
-                ></iframe>
+                <div class="w-full flex flex-col gap-4 overflow-y-auto">
+                  {#each Array(numPages) as _, i}
+                    <canvas
+                      bind:this={canvasElements[i]}
+                      class="w-full h-auto rounded-lg border border-fondo-soft bg-white shadow-sm"
+                    ></canvas>
+                  {/each}
+                </div>
               {:else}
                 <img
-                  src={anuncioActivo.documento_url}
+                  src={safeDocumentoUrl}
                   alt="Documento"
                   onload={handleDocLoad}
                   class="w-full rounded-lg shadow-sm bg-white object-contain max-h-[60vh] sm:max-h-[80vh]"
@@ -738,7 +860,7 @@
             {#if isDocPdf}
               <div class="text-center sm:hidden -mt-2">
                 <a
-                  href={anuncioActivo.documento_url}
+                  href={safeDocumentoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-xs font-semibold text-primario underline hover:text-primario-dark"
@@ -758,7 +880,9 @@
               {#if docLoading}
                 <p class="text-xs text-texto-grey font-medium">Cargando...</p>
               {:else if !tiempoLecturaCumplido}
-                <p class="text-xs text-amber-600 font-medium animate-pulse text-center">
+                <p
+                  class="text-xs text-amber-600 font-medium animate-pulse text-center"
+                >
                   Por favor visualice el documento. Analizando lectura...
                 </p>
               {:else if !documentoLeido}
@@ -808,7 +932,7 @@
               {#if docLoading}
                 Cargando documento...
               {:else if !tiempoLecturaCumplido}
-                Visualice el documento (Espere...)
+                Visualice el documento (Espere {tiempoLecturaRestante}s...)
               {:else if !documentoLeido}
                 Deslice hacia abajo para continuar
               {:else if indiceAnuncioActual < listaAnunciosPendientes.length - 1}

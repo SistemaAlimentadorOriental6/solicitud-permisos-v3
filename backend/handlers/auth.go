@@ -45,7 +45,7 @@ func Login(c *fiber.Ctx) error {
 	var cargo string
 
 	if req.Codigo != "" {
-		codigosAdmin := []string{"9999", "0000", "1303", "0101", "7654"}
+		codigosAdmin := []string{"9999", "0000", "1303", "0101", "7654", "8246"}
 		esAdmin := false
 		for _, adminCode := range codigosAdmin {
 			if req.Codigo == adminCode {
@@ -121,27 +121,44 @@ func Login(c *fiber.Ctx) error {
 	} else {
 		log.Printf("[LOGIN DEBUG] Sin codigo, buscando empleado mantenimiento por cedula: '%s'", req.Cedula)
 		empleado, err := findMantenimientoEmpleadoByCedula(req.Cedula)
-		if err != nil {
-			log.Printf("[LOGIN DEBUG] Empleado mantenimiento no encontrado por cedula '%s': %v", req.Cedula, err)
-			return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
-				Success: false,
-				Message: "Usuario o contraseña incorrectos",
-			})
-		}
+		if err == nil {
+			if empleado.FFechaRetiro != nil {
+				log.Printf("[LOGIN DEBUG] Empleado mantenimiento con fecha de retiro: %v (f_ndc: %d)", empleado.FFechaRetiro, empleado.FNdc)
+				return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
+					Success: false,
+					Message: "Usuario o contraseña incorrectos",
+				})
+			}
+			area = "Mantenimiento"
+			codigo = ""
+			nombre = empleado.FNombreEmpl
+			cargo = empleado.FDescCargo
+			log.Printf("[LOGIN DEBUG] Empleado mantenimiento OK: %s (f_ndc: %d)", nombre, empleado.FNdc)
+		} else {
+			log.Printf("[LOGIN DEBUG] No es mantenimiento, buscando empleado via-vigilantes por cedula: '%s'", req.Cedula)
+			empleado, err = findViaVigilantesEmpleadoByCedula(req.Cedula)
+			if err != nil {
+				log.Printf("[LOGIN DEBUG] Empleado via-vigilantes no encontrado por cedula '%s': %v", req.Cedula, err)
+				return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
+					Success: false,
+					Message: "Usuario o contraseña incorrectos",
+				})
+			}
 
-		if empleado.FFechaRetiro != nil {
-			log.Printf("[LOGIN DEBUG] Empleado mantenimiento con fecha de retiro: %v (f_ndc: %d)", empleado.FFechaRetiro, empleado.FNdc)
-			return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
-				Success: false,
-				Message: "Usuario o contraseña incorrectos",
-			})
-		}
+			if empleado.FFechaRetiro != nil {
+				log.Printf("[LOGIN DEBUG] Empleado via-vigilantes con fecha de retiro: %v (f_ndc: %d)", empleado.FFechaRetiro, empleado.FNdc)
+				return c.Status(fiber.StatusUnauthorized).JSON(models.LoginResponse{
+					Success: false,
+					Message: "Usuario o contraseña incorrectos",
+				})
+			}
 
-		area = "Mantenimiento"
-		codigo = ""
-		nombre = empleado.FNombreEmpl
-		cargo = empleado.FDescCargo
-		log.Printf("[LOGIN DEBUG] Empleado mantenimiento OK: %s (f_ndc: %d)", nombre, empleado.FNdc)
+			area = "Via-Vigilantes"
+			codigo = ""
+			nombre = empleado.FNombreEmpl
+			cargo = empleado.FDescCargo
+			log.Printf("[LOGIN DEBUG] Empleado via-vigilantes OK: %s (f_ndc: %d)", nombre, empleado.FNdc)
+		}
 	}
 
 	token, err := utils.GenerateToken(struct {
@@ -350,10 +367,42 @@ func findMantenimientoEmpleadoByCedula(cedula string) (*models.Empleado, error) 
 	return &emp, nil
 }
 
+func findViaVigilantesEmpleadoByCedula(cedula string) (*models.Empleado, error) {
+	db := db.GetUnoEEDB()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	query := `SELECT TOP 1 f_nit_empl, f_nombre_empl, f_desc_cargo, f_fecha_retiro, f_ndc
+	          FROM SE_W0550
+	          WHERE RTRIM(f_nit_empl) = @cedula
+	          AND RTRIM(f_desc_cargo) IN ('AUXILIAR DE INTEGRACION', 'REGULADOR VIA', 'AUXILIAR DE FLOTA', 'AUXILIAR LOGISTICO')
+	          ORDER BY f_ndc DESC`
+
+	var emp models.Empleado
+	var nitEmpl string
+	err := db.QueryRowContext(ctx, query, sql.Named("cedula", cedula)).Scan(
+		&nitEmpl,
+		&emp.FNombreEmpl,
+		&emp.FDescCargo,
+		&emp.FFechaRetiro,
+		&emp.FNdc,
+	)
+	emp.FNitEmpl = strings.TrimSpace(nitEmpl)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("empleado no encontrado")
+		}
+		return nil, err
+	}
+
+	return &emp, nil
+}
+
 func Me(c *fiber.Ctx) error {
 	claims := c.Locals("user").(*utils.Claims)
 
-	codigosAdmin := []string{"9999", "0000", "1303", "0101", "7654"}
+	codigosAdmin := []string{"9999", "0000", "1303", "0101", "7654", "8246"}
 	esAdmin := false
 	for _, adminCode := range codigosAdmin {
 		if claims.Codigo == adminCode {
@@ -628,6 +677,24 @@ func GetPermisosTipos(c *fiber.Ctx) error {
 		})
 	}
 
+	if claims.Area == "Via-Vigilantes" {
+		tipos := []TipoNovedad{
+			{Nombre: "Descanso"},
+			{Nombre: "Licencia no remunerada"},
+			{Nombre: "Cita médica"},
+			{Nombre: "Tabla Partida"},
+			{Nombre: "Día A.M."},
+			{Nombre: "Día P.M."},
+			{Nombre: "Cumpleaños"},
+			{Nombre: "Vacaciones"},
+			{Nombre: "Permiso para estudiar"},
+		}
+		return c.JSON(Response{
+			Success: true,
+			Tipos:   tipos,
+		})
+	}
+
 	tipos := []TipoNovedad{
 		{Nombre: "Cumpleaños"},
 		{Nombre: "Cita médica"},
@@ -728,6 +795,8 @@ func ListSolicitudesPendientes(c *fiber.Ctx) error {
 		query += ` AND tipo_usuario = 'se_operaciones'`
 	} else if area == "mantenimiento" {
 		query += ` AND tipo_usuario = 'se_mantenimiento'`
+	} else if area == "via-vigilantes" {
+		query += ` AND tipo_usuario = 'se_via_vigilantes'`
 	}
 
 	query += ` ORDER BY fecha_creacion DESC`
@@ -758,8 +827,10 @@ func ListSolicitudesPendientes(c *fiber.Ctx) error {
 	var rawList []solicitudRaw
 	var countOperaciones int
 	var countMantenimiento int
+	var countViaVigilantes int
 	var codigosOps []string
 	var cedulasMant []string
+	var cedulasVia []string
 
 	for rows.Next() {
 		var raw solicitudRaw
@@ -775,6 +846,11 @@ func ListSolicitudesPendientes(c *fiber.Ctx) error {
 			countOperaciones++
 			if raw.cedula != "" {
 				codigosOps = append(codigosOps, raw.cedula)
+			}
+		} else if raw.tipoUsuario == "se_via_vigilantes" {
+			countViaVigilantes++
+			if raw.cedula != "" {
+				cedulasVia = append(cedulasVia, raw.cedula)
 			}
 		} else {
 			countMantenimiento++
@@ -793,6 +869,7 @@ func ListSolicitudesPendientes(c *fiber.Ctx) error {
 		}
 	}
 	todasCedulas = append(todasCedulas, cedulasMant...)
+	todasCedulas = append(todasCedulas, cedulasVia...)
 
 	nombresPorCedula := buscarNombresEnLote(todasCedulas)
 	fotosPorCedula := buscarFotosEnLote(todasCedulas)
@@ -833,9 +910,10 @@ func ListSolicitudesPendientes(c *fiber.Ctx) error {
 	return c.JSON(models.SolicitudesPendientesResponse{
 		Success:       true,
 		Message:       "OK",
-		Total:         countOperaciones + countMantenimiento,
+		Total:         countOperaciones + countMantenimiento + countViaVigilantes,
 		Operaciones:   countOperaciones,
 		Mantenimiento: countMantenimiento,
+		ViaVigilantes: countViaVigilantes,
 		Solicitudes:   solicitudes,
 	})
 }
@@ -855,6 +933,8 @@ func ListAllSolicitudes(c *fiber.Ctx) error {
 		query += ` AND tipo_usuario = 'se_operaciones'`
 	} else if area == "mantenimiento" {
 		query += ` AND tipo_usuario = 'se_mantenimiento'`
+	} else if area == "via-vigilantes" {
+		query += ` AND tipo_usuario = 'se_via_vigilantes'`
 	}
 
 	query += ` ORDER BY fecha_creacion DESC`
@@ -1253,15 +1333,21 @@ func buscarFotosEnLote(cedulas []string) map[string]string {
 func ListEmpleados(c *fiber.Ctx) error {
 	area := strings.ToLower(strings.TrimSpace(c.Query("area")))
 
-	if area != "operaciones" && area != "mantenimiento" {
+	if area == "via_vigilantes" || area == "se_via_vigilantes" {
+		area = "via-vigilantes"
+	}
+
+	if area != "operaciones" && area != "mantenimiento" && area != "via-vigilantes" {
 		return c.Status(fiber.StatusBadRequest).JSON(models.EmpleadosResponse{
 			Success: false,
-			Message: "Parámetro 'area' requerido. Valores válidos: operaciones, mantenimiento",
+			Message: "Parámetro 'area' requerido. Valores válidos: operaciones, mantenimiento, via-vigilantes",
 		})
 	}
 
 	if area == "operaciones" {
 		return listEmpleadosOperaciones(c)
+	} else if area == "via-vigilantes" {
+		return listEmpleadosViaVigilantes(c)
 	}
 
 	return listEmpleadosMantenimiento(c)
@@ -1410,6 +1496,75 @@ func listEmpleadosMantenimiento(c *fiber.Ctx) error {
 			Cedula: m.cedula,
 			Nombre: m.nombre,
 			Cargo:  m.cargo,
+			Foto:   foto,
+		})
+	}
+
+	return c.JSON(models.EmpleadosResponse{
+		Success:   true,
+		Message:   "OK",
+		Total:     len(empleados),
+		Empleados: empleados,
+	})
+}
+
+func listEmpleadosViaVigilantes(c *fiber.Ctx) error {
+	unoeeDB := db.GetUnoEEDB()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	query := `SELECT RTRIM(f_nit_empl), f_nombre_empl, f_desc_cargo FROM SE_W0550
+	          WHERE RTRIM(f_desc_cargo) IN ('AUXILIAR DE INTEGRACION', 'REGULADOR VIA', 'AUXILIAR DE FLOTA', 'AUXILIAR LOGISTICO')
+	          AND f_fecha_retiro IS NULL`
+
+	rows, err := unoeeDB.QueryContext(ctx, query)
+	if err != nil {
+		log.Printf("Error query empleados via-vigilantes: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(models.EmpleadosResponse{
+			Success: false,
+			Message: "Error al consultar empleados: " + err.Error(),
+		})
+	}
+	defer rows.Close()
+
+	type viaRaw struct {
+		cedula string
+		nombre string
+		cargo  string
+	}
+
+	var rawVia []viaRaw
+	var cedulas []string
+
+	for rows.Next() {
+		var cedula, nombre, cargo string
+		if err := rows.Scan(&cedula, &nombre, &cargo); err != nil {
+			continue
+		}
+
+		cedula = strings.TrimSpace(cedula)
+		if cedula == "" {
+			continue
+		}
+
+		rawVia = append(rawVia, viaRaw{
+			cedula: cedula,
+			nombre: strings.TrimSpace(nombre),
+			cargo:  strings.TrimSpace(cargo),
+		})
+		cedulas = append(cedulas, cedula)
+	}
+
+	fotosPorCedula := buscarFotosEnLote(cedulas)
+
+	var empleados []models.EmpleadoDetalle
+	for _, v := range rawVia {
+		foto := fotosPorCedula[v.cedula]
+
+		empleados = append(empleados, models.EmpleadoDetalle{
+			Cedula: v.cedula,
+			Nombre: v.nombre,
+			Cargo:  v.cargo,
 			Foto:   foto,
 		})
 	}
