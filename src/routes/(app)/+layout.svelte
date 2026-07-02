@@ -5,6 +5,7 @@
   import AppHeader from '$lib/shared/components/AppHeader.svelte';
   import BottomNav from '$lib/shared/components/BottomNav.svelte';
   import LoadingOverlay from '$lib/shared/components/LoadingOverlay.svelte';
+  import { ocultarHeaderYNavbar } from '$lib/shared/stores/ui.store';
 
   let { children } = $props();
 
@@ -28,14 +29,18 @@
   <LoadingOverlay fullScreen={true} />
 {:else if $isAuthenticated}
   <div class="min-h-screen bg-fondo-soft flex flex-col">
-    <AppHeader />
+    {#if !$ocultarHeaderYNavbar}
+      <AppHeader />
+    {/if}
 
-    <main class="flex-1 pb-24">
+    <main class="flex-1 {$ocultarHeaderYNavbar ? '' : 'pb-24'}">
       <PageTransition>
         {@render children()}
       </PageTransition>
     </main>
 
-    <BottomNav />
+    {#if !$ocultarHeaderYNavbar}
+      <BottomNav />
+    {/if}
   </div>
 {/if}

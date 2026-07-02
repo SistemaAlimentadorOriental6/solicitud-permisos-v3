@@ -15,6 +15,7 @@
     getUltimaVista,
   } from "$lib/shared/config/api";
   import type { AnuncioDetalle } from "$lib/shared/config/api";
+  import { ocultarHeaderYNavbar } from "$lib/shared/stores/ui.store";
 
   let listaAnunciosPendientes = $state<AnuncioDetalle[]>([]);
   let indiceAnuncioActual = $state(0);
@@ -116,6 +117,13 @@
     if (verDocumento && safeDocumentoUrl && isDocPdf) {
       loadAndRenderPdf(safeDocumentoUrl);
     }
+  });
+
+  $effect(() => {
+    ocultarHeaderYNavbar.set(showVideoModal);
+    return () => {
+      ocultarHeaderYNavbar.set(false);
+    };
   });
   const safeDocumentoUrl = $derived.by(() => {
     let url = anuncioActivo?.documento_url || "";
