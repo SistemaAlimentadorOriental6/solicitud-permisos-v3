@@ -96,6 +96,7 @@ type SolicitudDetalle struct {
 	RespuestaAdmin string `json:"respuesta_admin"`
 	FechaGestion   string `json:"fecha_gestion,omitempty"`
 	UsuarioGestion string `json:"usuario_gestion,omitempty"`
+	Area           string `json:"area,omitempty"`
 }
 
 type SolicitudesRecientesResponse struct {

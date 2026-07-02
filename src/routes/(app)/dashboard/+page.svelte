@@ -494,11 +494,42 @@
 
 <div class="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl mx-auto">
   {#if $dashboardLoading}
-    <div class="flex flex-col items-center justify-center py-20 gap-4">
-      <div
-        class="w-10 h-10 border-3 border-primario border-t-transparent rounded-full animate-spin"
-      ></div>
-      <p class="text-sm text-texto-grey font-medium">Cargando dashboard...</p>
+    <div class="animate-pulse">
+      <!-- Skeleton Cabecera -->
+      <div class="mb-8 flex items-center gap-6">
+        <div class="flex-1">
+          <div class="h-10 bg-fondo-soft rounded-2xl w-1/2 sm:w-1/3 mb-3"></div>
+          <div class="flex items-center gap-3">
+            <div class="h-4 bg-fondo-soft rounded-lg w-1/4"></div>
+            <div class="h-4 bg-fondo-soft rounded-lg w-1/5"></div>
+          </div>
+        </div>
+        <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-fondo-soft flex-shrink-0"></div>
+      </div>
+
+      <!-- Skeleton Grid Estadísticas -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {#each Array(4) as _}
+          <div class="bg-white border border-fondo-soft rounded-2xl p-5 flex flex-col gap-3">
+            <div class="h-3 bg-fondo-soft rounded w-1/2"></div>
+            <div class="h-7 bg-fondo-soft rounded w-2/3"></div>
+          </div>
+        {/each}
+      </div>
+
+      <!-- Skeleton Accesos Rápidos -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {#each Array(2) as _}
+          <div class="bg-white rounded-2xl p-6 border border-fondo-soft flex gap-4">
+            <div class="w-12 h-12 bg-fondo-soft rounded-xl flex-shrink-0"></div>
+            <div class="flex-1">
+              <div class="h-5 bg-fondo-soft rounded w-1/2 mb-2"></div>
+              <div class="h-3 bg-fondo-soft rounded w-3/4 mb-4"></div>
+              <div class="h-3 bg-fondo-soft rounded w-1/4"></div>
+            </div>
+          </div>
+        {/each}
+      </div>
     </div>
   {:else if $dashboardStats}
     <div class="mb-8 flex items-center gap-6">

@@ -10,6 +10,7 @@ import (
 	"solicitud-permisos/internal/holidays"
 	"solicitud-permisos/middleware"
 	"solicitud-permisos/services"
+	_ "time/tzdata"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -74,6 +75,8 @@ func main() {
 	app.Get("/api/solicitudes/pendientes", handlers.ListSolicitudesPendientes)
 	app.Get("/api/solicitudes/recientes", handlers.GetSolicitudesRecientes)
 	app.Get("/api/solicitudes/historial/:cedula", handlers.GetHistorialByCedula)
+	app.Get("/api/solicitudes/respuestas-rapidas", handlers.ListRespuestasRapidas)
+	app.Post("/api/solicitudes/respuestas-rapidas", handlers.CrearRespuestaRapida)
 	app.Put("/api/solicitudes/:id/responder", handlers.ResponderSolicitud)
 	app.Delete("/api/solicitudes/:id", handlers.EliminarSolicitud)
 	app.Get("/api/admin/semana-solicitudes", handlers.GetSemanaSolicitudes)

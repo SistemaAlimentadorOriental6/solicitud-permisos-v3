@@ -320,47 +320,59 @@
   </div>
 
   <!-- Stats Cards -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-    <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
-      <div class="flex items-start justify-between mb-3">
-        <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-          <HugeiconsIcon icon={Database01Icon} size={20} class="text-blue-500" />
+  {#if $solicitudesTodasLoading}
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {#each [1, 2, 3, 4] as _}
+        <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm space-y-3">
+          <div class="w-10 h-10 bg-fondo-soft rounded-xl animate-pulse"></div>
+          <div class="h-3 w-24 bg-fondo-soft rounded-full animate-pulse"></div>
+          <div class="h-8 w-16 bg-fondo-soft rounded-lg animate-pulse"></div>
         </div>
-      </div>
-      <p class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1">Total Solicitudes</p>
-      <p class="font-display text-3xl font-extrabold text-texto-dark">{displayStats.total}</p>
+      {/each}
     </div>
+  {:else}
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
+        <div class="flex items-start justify-between mb-3">
+          <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+            <HugeiconsIcon icon={Database01Icon} size={20} class="text-blue-500" />
+          </div>
+        </div>
+        <p class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1">Total Solicitudes</p>
+        <p class="font-display text-3xl font-extrabold text-texto-dark">{displayStats.total}</p>
+      </div>
 
-    <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
-      <div class="flex items-start justify-between mb-3">
-        <div class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-          <HugeiconsIcon icon={CheckmarkCircle01Icon} size={20} class="text-emerald-500" />
+      <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
+        <div class="flex items-start justify-between mb-3">
+          <div class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+            <HugeiconsIcon icon={CheckmarkCircle01Icon} size={20} class="text-emerald-500" />
+          </div>
         </div>
+        <p class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1">Aprobadas</p>
+        <p class="font-display text-3xl font-extrabold text-texto-dark">{displayStats.aprobadas}</p>
       </div>
-      <p class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1">Aprobadas</p>
-      <p class="font-display text-3xl font-extrabold text-texto-dark">{displayStats.aprobadas}</p>
-    </div>
 
-    <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
-      <div class="flex items-start justify-between mb-3">
-        <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-          <HugeiconsIcon icon={AlertCircleIcon} size={20} class="text-amber-500" />
+      <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
+        <div class="flex items-start justify-between mb-3">
+          <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+            <HugeiconsIcon icon={AlertCircleIcon} size={20} class="text-amber-500" />
+          </div>
         </div>
+        <p class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1">Pendientes</p>
+        <p class="font-display text-3xl font-extrabold text-texto-dark">{displayStats.pendientes}</p>
       </div>
-      <p class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1">Pendientes</p>
-      <p class="font-display text-3xl font-extrabold text-texto-dark">{displayStats.pendientes}</p>
-    </div>
 
-    <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
-      <div class="flex items-start justify-between mb-3">
-        <div class="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
-          <HugeiconsIcon icon={CancelCircleIcon} size={20} class="text-red-500" />
+      <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
+        <div class="flex items-start justify-between mb-3">
+          <div class="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center">
+            <HugeiconsIcon icon={CancelCircleIcon} size={20} class="text-red-500" />
+          </div>
         </div>
+        <p class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1">Rechazadas</p>
+        <p class="font-display text-3xl font-extrabold text-texto-dark">{displayStats.rechazadas}</p>
       </div>
-      <p class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1">Rechazadas</p>
-      <p class="font-display text-3xl font-extrabold text-texto-dark">{displayStats.rechazadas}</p>
     </div>
-  </div>
+  {/if}
 
   <!-- Solicitudes List -->
   <div class="bg-white rounded-2xl border border-fondo-soft overflow-hidden shadow-sm">
@@ -490,9 +502,28 @@
     <!-- Lista con Paginación -->
     <div class="p-6">
       {#if $solicitudesTodasLoading}
-        <div class="flex items-center justify-center py-12">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primario"></div>
-          <span class="ml-3 text-sm text-texto-grey">Cargando historial...</span>
+        <div class="space-y-4">
+          {#each [1, 2, 3, 4, 5] as _}
+            <div class="bg-white border border-fondo-soft rounded-2xl p-5 shadow-sm space-y-4 animate-pulse">
+              <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-xl bg-fondo-soft shrink-0"></div>
+                <div class="flex-1 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <div class="h-4 w-48 bg-fondo-soft rounded-lg"></div>
+                    <div class="h-6 w-20 bg-fondo-soft rounded-lg"></div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <div class="h-3 w-24 bg-fondo-soft rounded-full"></div>
+                    <div class="h-3 w-32 bg-fondo-soft rounded-full"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-4 mt-3">
+                <div class="h-8 w-28 bg-fondo-soft rounded-lg"></div>
+                <div class="h-8 w-28 bg-fondo-soft rounded-lg"></div>
+              </div>
+            </div>
+          {/each}
         </div>
       {:else if filteredHistorial.length === 0}
         <div class="text-center py-12">

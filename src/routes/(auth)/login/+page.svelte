@@ -3,7 +3,7 @@
   import { isAuthenticated } from "$lib/domains/auth";
   import { goto } from "$app/navigation";
   import logoSrc from "$lib/assets/LOGOSAO6.svg";
-  import wallpaperSrc from "$lib/assets/SAO6WALLPAPER.png";
+  import wallpaperSrc from "$lib/assets/SAO6WALLPAPER.jpg";
 
   let currentYear = new Date().getFullYear();
 
@@ -84,11 +84,10 @@
         <h1
           class="font-display text-3xl font-extrabold text-texto-dark leading-tight tracking-tight"
         >
-          Bienvenido<span class="inline-block animate-wave">👋</span>
+          Bienvenido de nuevo<span class="inline-block animate-wave"></span>
         </h1>
         <p class="mt-2 text-texto-grey text-sm leading-relaxed font-medium">
-          Ingresa tus credenciales para acceder al sistema de gestión
-          disciplinaria.
+          Ingresa tus credenciales para acceder a la solicitud de permisos
         </p>
       </div>
 

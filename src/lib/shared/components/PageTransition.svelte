@@ -1,72 +1,42 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { beforeNavigate, goto } from '$app/navigation';
-  import { onMount, onDestroy } from 'svelte';
-  import gsap from 'gsap';
+  import { onNavigate } from '$app/navigation';
 
   let { children } = $props();
-  let container: HTMLElement = $state()!;
-  let isAnimating = $state(false);
-  let pendingNav = $state<string | null>(null);
 
-  function enterAnimation() {
-    if (!container) return;
-    gsap.fromTo(container,
-      { opacity: 0, y: 16, scale: 0.98 },
-      { opacity: 1, y: 0, scale: 1, duration: 0.35, ease: 'power3.out', clearProps: 'all' }
-    );
-  }
+  // Activar View Transitions nativas del navegador si están soportadas
+  onNavigate((navigation) => {
+    if (!document.startViewTransition) return;
 
-  function exitAnimation(): Promise<void> {
-    if (!container) return Promise.resolve();
     return new Promise((resolve) => {
-      gsap.to(container, {
-        opacity: 0,
-        y: -12,
-        scale: 0.98,
-        duration: 0.2,
-        ease: 'power2.in',
-        clearProps: 'all',
-        onComplete: resolve
+      document.startViewTransition(async () => {
+        resolve();
+        await navigation.complete;
       });
     });
-  }
-
-  onMount(() => {
-    gsap.set(container, { opacity: 0, y: 16, scale: 0.98 });
-    enterAnimation();
-
-    beforeNavigate(async (navigation) => {
-      if (navigation.type !== 'link') return;
-      if (isAnimating) return;
-      if (!navigation.to) return;
-
-      navigation.cancel();
-      isAnimating = true;
-      pendingNav = navigation.to.url.pathname;
-
-      await exitAnimation();
-
-      if (pendingNav) {
-        goto(pendingNav);
-        pendingNav = null;
-        isAnimating = false;
-      }
-    });
-  });
-
-  $effect(() => {
-    const _ = $page.url.pathname;
-    if (!isAnimating) {
-      enterAnimation();
-    }
-  });
-
-  onDestroy(() => {
-    gsap.killTweensOf(container);
   });
 </script>
 
-<div bind:this={container}>
-  {@render children()}
-</div>
+{#key $page.url.pathname}
+  <div class="page-container">
+    {@render children()}
+  </div>
+{/key}
+
+<style>
+  .page-container {
+    animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    will-change: opacity, transform;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.99);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+</style>

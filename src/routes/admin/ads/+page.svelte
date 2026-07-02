@@ -222,6 +222,8 @@
   }
 
   async function cargarAnuncios() {
+    const esCargaInicial = anuncios.length === 0;
+    if (esCargaInicial) loading = true;
     const res = await listarAnuncios();
     if (res.success) {
       anuncios = res.anuncios;
@@ -231,6 +233,7 @@
         second: "2-digit",
       });
     }
+    if (esCargaInicial) loading = false;
   }
 
   async function refreshAnuncios() {
@@ -457,7 +460,20 @@
           </button>
         </div>
 
-        {#if anuncios.length === 0}
+        {#if loading && anuncios.length === 0}
+          <div class="space-y-4">
+            {#each [1, 2, 3] as _}
+              <div class="flex items-center gap-4 p-4 bg-fondo-soft rounded-xl animate-pulse">
+                <div class="w-24 h-16 bg-fondo-soft/50 rounded-lg flex-shrink-0"></div>
+                <div class="flex-1 space-y-2">
+                  <div class="h-4 w-32 bg-fondo-soft/50 rounded-lg"></div>
+                  <div class="h-3 w-48 bg-fondo-soft/50 rounded-full"></div>
+                </div>
+                <div class="w-20 h-8 bg-fondo-soft/50 rounded-lg"></div>
+              </div>
+            {/each}
+          </div>
+        {:else if anuncios.length === 0}
           <div class="text-center py-8">
             <div
               class="w-16 h-16 bg-fondo-soft rounded-2xl flex items-center justify-center mx-auto mb-4"

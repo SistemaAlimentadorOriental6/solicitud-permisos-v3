@@ -13,7 +13,7 @@
     ArrowRight01Icon,
   } from "@hugeicons/core-free-icons";
   import { HugeiconsIcon } from "@hugeicons/svelte";
-  import { adminStore, adminStats } from "$lib/domains/admin";
+  import { adminStore, adminStats, adminLoading } from "$lib/domains/admin";
   import {
     solicitudesStore,
     solicitudesPendientes,
@@ -427,215 +427,248 @@
   </div>
 
   <!-- Stats Cards -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-    <!-- Total -->
-    <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
-      <div class="flex items-start justify-between mb-3">
-        <div
-          class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center"
-        >
-          <HugeiconsIcon icon={UserGroupIcon} size={20} class="text-blue-500" />
+  {#if $adminLoading}
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {#each [1, 2, 3, 4] as _}
+        <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm space-y-3">
+          <div class="w-10 h-10 bg-fondo-soft rounded-xl animate-pulse"></div>
+          <div class="h-3 w-24 bg-fondo-soft rounded-full animate-pulse"></div>
+          <div class="h-8 w-16 bg-fondo-soft rounded-lg animate-pulse"></div>
         </div>
-      </div>
-      <p
-        class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1"
-      >
-        Total Solicitudes
-      </p>
-      <p class="font-display text-3xl font-extrabold text-texto-dark">
-        {$adminStats?.total ?? 0}
-      </p>
+      {/each}
     </div>
+  {:else}
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Total -->
+      <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
+        <div class="flex items-start justify-between mb-3">
+          <div
+            class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center"
+          >
+            <HugeiconsIcon icon={UserGroupIcon} size={20} class="text-blue-500" />
+          </div>
+        </div>
+        <p
+          class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1"
+        >
+          Total Solicitudes
+        </p>
+        <p class="font-display text-3xl font-extrabold text-texto-dark">
+          {$adminStats?.total ?? 0}
+        </p>
+      </div>
 
-    <!-- Aprobadas -->
-    <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
-      <div class="flex items-start justify-between mb-3">
-        <div
-          class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center"
-        >
-          <HugeiconsIcon
-            icon={CheckmarkCircle01Icon}
-            size={20}
-            class="text-emerald-500"
-          />
+      <!-- Aprobadas -->
+      <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
+        <div class="flex items-start justify-between mb-3">
+          <div
+            class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center"
+          >
+            <HugeiconsIcon
+              icon={CheckmarkCircle01Icon}
+              size={20}
+              class="text-emerald-500"
+            />
+          </div>
         </div>
+        <p
+          class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1"
+        >
+          Aprobadas
+        </p>
+        <p class="font-display text-3xl font-extrabold text-texto-dark">
+          {$adminStats?.aprobadas ?? 0}
+        </p>
       </div>
-      <p
-        class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1"
-      >
-        Aprobadas
-      </p>
-      <p class="font-display text-3xl font-extrabold text-texto-dark">
-        {$adminStats?.aprobadas ?? 0}
-      </p>
-    </div>
 
-    <!-- Pendientes -->
-    <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
-      <div class="flex items-start justify-between mb-3">
-        <div
-          class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center"
+      <!-- Pendientes -->
+      <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
+        <div class="flex items-start justify-between mb-3">
+          <div
+            class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center"
+          >
+            <HugeiconsIcon
+              icon={AlertCircleIcon}
+              size={20}
+              class="text-amber-500"
+            />
+          </div>
+        </div>
+        <p
+          class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1"
         >
-          <HugeiconsIcon
-            icon={AlertCircleIcon}
-            size={20}
-            class="text-amber-500"
-          />
+          Pendientes
+        </p>
+        <p class="font-display text-3xl font-extrabold text-texto-dark">
+          {$solicitudesPendientesStats.total ?? 0}
+        </p>
+        <div class="flex gap-2 mt-2 text-[10px] flex-wrap">
+          <span class="text-blue-500 font-semibold"
+            >Op: {$solicitudesPendientesStats.operaciones ?? 0}</span
+          >
+          <span class="text-texto-grey">|</span>
+          <span class="text-purple-500 font-semibold"
+            >Mant: {$solicitudesPendientesStats.mantenimiento ?? 0}</span
+          >
+          <span class="text-texto-grey">|</span>
+          <span class="text-emerald-600 font-semibold"
+            >Vía: {$solicitudesPendientesStats.via_vigilantes ?? 0}</span
+          >
         </div>
       </div>
-      <p
-        class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1"
-      >
-        Pendientes
-      </p>
-      <p class="font-display text-3xl font-extrabold text-texto-dark">
-        {$solicitudesPendientesStats.total ?? 0}
-      </p>
-      <div class="flex gap-2 mt-2 text-[10px] flex-wrap">
-        <span class="text-blue-500 font-semibold"
-          >Op: {$solicitudesPendientesStats.operaciones ?? 0}</span
-        >
-        <span class="text-texto-grey">|</span>
-        <span class="text-purple-500 font-semibold"
-          >Mant: {$solicitudesPendientesStats.mantenimiento ?? 0}</span
-        >
-        <span class="text-texto-grey">|</span>
-        <span class="text-emerald-600 font-semibold"
-          >Vía: {$solicitudesPendientesStats.via_vigilantes ?? 0}</span
-        >
-      </div>
-    </div>
 
-    <!-- Rechazadas -->
-    <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
-      <div class="flex items-start justify-between mb-3">
-        <div
-          class="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center"
-        >
-          <HugeiconsIcon
-            icon={CancelCircleIcon}
-            size={20}
-            class="text-red-500"
-          />
+      <!-- Rechazadas -->
+      <div class="bg-white rounded-2xl p-5 border border-fondo-soft shadow-sm">
+        <div class="flex items-start justify-between mb-3">
+          <div
+            class="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center"
+          >
+            <HugeiconsIcon
+              icon={CancelCircleIcon}
+              size={20}
+              class="text-red-500"
+            />
+          </div>
         </div>
+        <p
+          class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1"
+        >
+          Rechazadas
+        </p>
+        <p class="font-display text-3xl font-extrabold text-texto-dark">
+          {$adminStats?.rechazadas ?? 0}
+        </p>
       </div>
-      <p
-        class="text-[10px] font-bold text-texto-grey uppercase tracking-wider mb-1"
-      >
-        Rechazadas
-      </p>
-      <p class="font-display text-3xl font-extrabold text-texto-dark">
-        {$adminStats?.rechazadas ?? 0}
-      </p>
     </div>
-  </div>
+  {/if}
 
   <!-- Desglose Sections -->
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Desglose de Permisos -->
-    <div class="bg-white rounded-2xl border border-fondo-soft p-6 shadow-sm">
-      <div class="flex items-center gap-3 mb-5">
-        <div
-          class="w-9 h-9 bg-fondo-soft rounded-xl flex items-center justify-center"
-        >
-          <HugeiconsIcon icon={File01Icon} size={18} class="text-texto-grey" />
+  {#if $adminLoading}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {#each [1, 2] as _}
+        <div class="bg-white rounded-2xl border border-fondo-soft p-6 shadow-sm space-y-4">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-fondo-soft rounded-xl animate-pulse"></div>
+            <div class="h-4 w-36 bg-fondo-soft rounded-lg animate-pulse"></div>
+          </div>
+          <div class="space-y-3">
+            {#each [1, 2, 3] as _}
+              <div class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl">
+                <div class="h-3 w-32 bg-fondo-soft rounded-full animate-pulse"></div>
+                <div class="h-5 w-10 bg-fondo-soft rounded-lg animate-pulse"></div>
+              </div>
+            {/each}
+          </div>
         </div>
-        <h3
-          class="font-display text-sm font-bold text-texto-dark uppercase tracking-wider"
-        >
-          Desglose de Permisos
-        </h3>
+      {/each}
+    </div>
+  {:else}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Desglose de Permisos -->
+      <div class="bg-white rounded-2xl border border-fondo-soft p-6 shadow-sm">
+        <div class="flex items-center gap-3 mb-5">
+          <div
+            class="w-9 h-9 bg-fondo-soft rounded-xl flex items-center justify-center"
+          >
+            <HugeiconsIcon icon={File01Icon} size={18} class="text-texto-grey" />
+          </div>
+          <h3
+            class="font-display text-sm font-bold text-texto-dark uppercase tracking-wider"
+          >
+            Desglose de Permisos
+          </h3>
+        </div>
+
+        <div class="space-y-3">
+          <div
+            class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
+          >
+            <span
+              class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
+              >Total Permisos</span
+            >
+            <span class="font-display text-lg font-extrabold text-texto-dark"
+              >{$adminStats?.totalPermisos ?? 0}</span
+            >
+          </div>
+          <div
+            class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
+          >
+            <span
+              class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
+              >Pendientes de Revisión</span
+            >
+            <span class="font-display text-lg font-extrabold text-amber-500"
+              >{$adminStats?.pendientesRevision ?? 0}</span
+            >
+          </div>
+          <div
+            class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
+          >
+            <span
+              class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
+              >Rechazados</span
+            >
+            <span class="font-display text-lg font-extrabold text-error"
+              >{$adminStats?.rechazados ?? 0}</span
+            >
+          </div>
+        </div>
       </div>
 
-      <div class="space-y-3">
-        <div
-          class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
-        >
-          <span
-            class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
-            >Total Permisos</span
+      <!-- Desglose de Recientes (última hora) -->
+      <div class="bg-white rounded-2xl border border-fondo-soft p-6 shadow-sm">
+        <div class="flex items-center gap-3 mb-5">
+          <div
+            class="w-9 h-9 bg-fondo-soft rounded-xl flex items-center justify-center"
           >
-          <span class="font-display text-lg font-extrabold text-texto-dark"
-            >{$adminStats?.totalPermisos ?? 0}</span
+            <HugeiconsIcon icon={LaptopIcon} size={18} class="text-texto-grey" />
+          </div>
+          <h3
+            class="font-display text-sm font-bold text-texto-dark uppercase tracking-wider"
           >
+            Gestionadas Recientes
+          </h3>
         </div>
-        <div
-          class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
-        >
-          <span
-            class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
-            >Pendientes de Revisión</span
+
+        <div class="space-y-3">
+          <div
+            class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
           >
-          <span class="font-display text-lg font-extrabold text-amber-500"
-            >{$adminStats?.pendientesRevision ?? 0}</span
+            <span
+              class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
+              >Total (última hora)</span
+            >
+            <span class="font-display text-lg font-extrabold text-texto-dark"
+              >{$solicitudesRecientesStats?.total ?? 0}</span
+            >
+          </div>
+          <div
+            class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
           >
-        </div>
-        <div
-          class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
-        >
-          <span
-            class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
-            >Rechazados</span
+            <span
+              class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
+              >Aprobadas</span
+            >
+            <span class="font-display text-lg font-extrabold text-emerald-500"
+              >{$solicitudesRecientesStats?.aprobadas ?? 0}</span
+            >
+          </div>
+          <div
+            class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
           >
-          <span class="font-display text-lg font-extrabold text-error"
-            >{$adminStats?.rechazados ?? 0}</span
-          >
+            <span
+              class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
+              >Rechazadas</span
+            >
+            <span class="font-display text-lg font-extrabold text-error"
+              >{$solicitudesRecientesStats?.rechazadas ?? 0}</span
+            >
+          </div>
         </div>
       </div>
     </div>
-
-    <!-- Desglose de Recientes (última hora) -->
-    <div class="bg-white rounded-2xl border border-fondo-soft p-6 shadow-sm">
-      <div class="flex items-center gap-3 mb-5">
-        <div
-          class="w-9 h-9 bg-fondo-soft rounded-xl flex items-center justify-center"
-        >
-          <HugeiconsIcon icon={LaptopIcon} size={18} class="text-texto-grey" />
-        </div>
-        <h3
-          class="font-display text-sm font-bold text-texto-dark uppercase tracking-wider"
-        >
-          Gestionadas Recientes
-        </h3>
-      </div>
-
-      <div class="space-y-3">
-        <div
-          class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
-        >
-          <span
-            class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
-            >Total (última hora)</span
-          >
-          <span class="font-display text-lg font-extrabold text-texto-dark"
-            >{$solicitudesRecientesStats?.total ?? 0}</span
-          >
-        </div>
-        <div
-          class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
-        >
-          <span
-            class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
-            >Aprobadas</span
-          >
-          <span class="font-display text-lg font-extrabold text-emerald-500"
-            >{$solicitudesRecientesStats?.aprobadas ?? 0}</span
-          >
-        </div>
-        <div
-          class="flex items-center justify-between p-4 bg-fondo-soft/50 rounded-xl"
-        >
-          <span
-            class="text-xs font-semibold text-texto-grey uppercase tracking-wider"
-            >Rechazadas</span
-          >
-          <span class="font-display text-lg font-extrabold text-error"
-            >{$solicitudesRecientesStats?.rechazadas ?? 0}</span
-          >
-        </div>
-      </div>
-    </div>
-  </div>
+  {/if}
 
   <!-- Weekly Calendar -->
   <div
@@ -949,13 +982,32 @@
 
       {#if activeTab === "permisos"}
         {#if $solicitudesPendientesLoading}
-          <div class="flex items-center justify-center py-12">
-            <div
-              class="animate-spin rounded-full h-8 w-8 border-b-2 border-primario"
-            ></div>
-            <span class="ml-3 text-sm text-texto-grey"
-              >Cargando solicitudes pendientes...</span
-            >
+          <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {#each [1, 2, 3] as _}
+              <div class="bg-white border border-fondo-soft rounded-3xl p-5 shadow-sm space-y-4 min-h-[260px] flex flex-col">
+                <div class="flex items-start justify-between">
+                  <div class="flex items-center gap-3">
+                    <div class="w-14 h-14 rounded-full bg-fondo-soft animate-pulse"></div>
+                    <div class="space-y-2">
+                      <div class="h-4 w-32 bg-fondo-soft rounded-lg animate-pulse"></div>
+                      <div class="h-3 w-16 bg-fondo-soft rounded-full animate-pulse"></div>
+                    </div>
+                  </div>
+                  <div class="h-6 w-20 bg-fondo-soft rounded-lg animate-pulse"></div>
+                </div>
+                <div class="space-y-3 flex-1 mt-4">
+                  <div class="flex items-center gap-2">
+                    <div class="w-5 h-5 bg-fondo-soft rounded-md animate-pulse"></div>
+                    <div class="h-3 w-40 bg-fondo-soft rounded-full animate-pulse"></div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="w-5 h-5 bg-fondo-soft rounded-md animate-pulse"></div>
+                    <div class="h-3 w-48 bg-fondo-soft rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+                <div class="h-10 bg-fondo-soft rounded-xl animate-pulse mt-auto"></div>
+              </div>
+            {/each}
           </div>
         {:else if $solicitudesPendientes.length === 0}
           <div class="text-center py-12">
@@ -1234,13 +1286,32 @@
           </div>
         {/if}
       {:else if $solicitudesRecientesLoading}
-        <div class="flex items-center justify-center py-12">
-          <div
-            class="animate-spin rounded-full h-8 w-8 border-b-2 border-primario"
-          ></div>
-          <span class="ml-3 text-sm text-texto-grey"
-            >Cargando solicitudes recientes...</span
-          >
+        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+          {#each [1, 2, 3] as _}
+            <div class="bg-white border border-fondo-soft rounded-3xl p-5 shadow-sm space-y-4 min-h-[260px] flex flex-col">
+              <div class="flex items-start justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-14 h-14 rounded-full bg-fondo-soft animate-pulse"></div>
+                  <div class="space-y-2">
+                    <div class="h-4 w-32 bg-fondo-soft rounded-lg animate-pulse"></div>
+                    <div class="h-3 w-16 bg-fondo-soft rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+                <div class="h-6 w-20 bg-fondo-soft rounded-lg animate-pulse"></div>
+              </div>
+              <div class="space-y-3 flex-1 mt-4">
+                <div class="flex items-center gap-2">
+                  <div class="w-5 h-5 bg-fondo-soft rounded-md animate-pulse"></div>
+                  <div class="h-3 w-40 bg-fondo-soft rounded-full animate-pulse"></div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <div class="w-5 h-5 bg-fondo-soft rounded-md animate-pulse"></div>
+                  <div class="h-3 w-48 bg-fondo-soft rounded-full animate-pulse"></div>
+                </div>
+              </div>
+              <div class="h-10 bg-fondo-soft rounded-xl animate-pulse mt-auto"></div>
+            </div>
+          {/each}
         </div>
       {:else if $solicitudesRecientes.length === 0}
         <div class="text-center py-12">

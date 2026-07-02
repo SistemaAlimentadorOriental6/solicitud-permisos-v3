@@ -496,3 +496,110 @@ func EliminarSolicitud(c *fiber.Ctx) error {
 		"message": "Solicitud eliminada exitosamente",
 	})
 }
+
+// ListRespuestasRapidas obtiene las respuestas predefinidas para la toma de decisiones.
+func ListRespuestasRapidas(c *fiber.Ctx) error {
+	area := c.Query("area")
+
+	dbInstance := db.GetSolicitudPermisosDB()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var query string
+	var args []interface{}
+
+	if area != "" {
+		// Selecciona respuestas asociadas al área o globales
+		query = `SELECT id, area, respuesta, creado_en FROM respuestas_rapidas WHERE area = ? OR area IS NULL ORDER BY creado_en DESC`
+		args = append(args, area)
+	} else {
+		query = `SELECT id, area, respuesta, creado_en FROM respuestas_rapidas ORDER BY creado_en DESC`
+	}
+
+	rows, err := dbInstance.QueryContext(ctx, query, args...)
+	if err != nil {
+		log.Printf("Error consultando respuestas rápidas en base de datos: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"message": "Error al consultar respuestas rápidas: " + err.Error(),
+		})
+	}
+	defer rows.Close()
+
+	type RespuestaRapida struct {
+		ID        int     `json:"id"`
+		Area      *string `json:"area"`
+		Respuesta string  `json:"respuesta"`
+		CreadoEn  string  `json:"creado_en"`
+	}
+
+	respuestas := make([]RespuestaRapida, 0)
+	for rows.Next() {
+		var r RespuestaRapida
+		var areaVal sql.NullString
+		err := rows.Scan(&r.ID, &areaVal, &r.Respuesta, &r.CreadoEn)
+		if err != nil {
+			log.Printf("Error escaneando fila: %v", err)
+			continue
+		}
+		if areaVal.Valid {
+			r.Area = &areaVal.String
+		}
+		respuestas = append(respuestas, r)
+	}
+
+	return c.JSON(fiber.Map{
+		"success":    true,
+		"respuestas": respuestas,
+	})
+}
+
+// CrearRespuestaRapida guarda una nueva respuesta rápida en la base de datos.
+func CrearRespuestaRapida(c *fiber.Ctx) error {
+	type Request struct {
+		Respuesta string `json:"respuesta"`
+		Area      string `json:"area"`
+	}
+
+	var req Request
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"message": "Cuerpo de solicitud inválido",
+		})
+	}
+
+	if strings.TrimSpace(req.Respuesta) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"success": false,
+			"message": "El campo respuesta es obligatorio",
+		})
+	}
+
+	dbInstance := db.GetSolicitudPermisosDB()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var areaVal interface{}
+	if strings.TrimSpace(req.Area) != "" {
+		areaVal = strings.TrimSpace(req.Area)
+	}
+
+	_, err := dbInstance.ExecContext(ctx,
+		`INSERT INTO respuestas_rapidas (area, respuesta) VALUES (?, ?)`,
+		areaVal, strings.TrimSpace(req.Respuesta),
+	)
+	if err != nil {
+		log.Printf("Error insertando respuesta rápida: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"success": false,
+			"message": "Error al guardar la respuesta: " + err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"success": true,
+		"message": "Respuesta rápida creada exitosamente",
+	})
+}
+

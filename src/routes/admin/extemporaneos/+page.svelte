@@ -252,7 +252,20 @@
 
             <!-- Scrollable list -->
             <div class="max-h-72 overflow-y-auto">
-              {#if empleadosFiltrados.length === 0}
+              {#if empleadosLoading}
+                <div class="divide-y divide-fondo-soft">
+                  {#each [1, 2, 3] as _}
+                    <div class="w-full px-4 py-3 flex items-center gap-3 animate-pulse">
+                      <div class="w-10 h-10 bg-fondo-soft rounded-xl flex-shrink-0"></div>
+                      <div class="flex-1 space-y-2">
+                        <div class="h-3.5 w-32 bg-fondo-soft rounded-lg"></div>
+                        <div class="h-2.5 w-20 bg-fondo-soft rounded-full"></div>
+                      </div>
+                      <div class="h-4 w-12 bg-fondo-soft rounded-md"></div>
+                    </div>
+                  {/each}
+                </div>
+              {:else if empleadosFiltrados.length === 0}
                 <div class="flex flex-col items-center justify-center py-8 gap-2 text-texto-grey">
                   <HugeiconsIcon icon={UserGroupIcon} size={24} class="text-texto-grey/50" />
                   <p class="text-xs font-medium">No se encontraron empleados</p>
@@ -349,15 +362,23 @@
             class="absolute z-50 w-full mt-2 bg-white rounded-2xl border border-fondo-soft shadow-xl overflow-hidden max-h-64 overflow-y-auto"
             transition:slide={{ duration: 200 }}
           >
-            {#each $permisosStore.tipos as tipo}
-              <button
-                type="button"
-                onclick={() => handleTipoChange(tipo)}
-                class="w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 {tipoNovedad === tipo ? 'bg-primario/10 text-primario' : 'text-texto-dark hover:bg-primario/10 hover:text-primario'}"
-              >
-                {tipo}
-              </button>
-            {/each}
+            {#if $permisosStore.isLoading}
+              <div class="p-3 space-y-2">
+                {#each [1, 2, 3] as _}
+                  <div class="h-9 bg-fondo-soft rounded-xl animate-pulse"></div>
+                {/each}
+              </div>
+            {:else}
+              {#each $permisosStore.tipos as tipo}
+                <button
+                  type="button"
+                  onclick={() => handleTipoChange(tipo)}
+                  class="w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 {tipoNovedad === tipo ? 'bg-primario/10 text-primario' : 'text-texto-dark hover:bg-primario/10 hover:text-primario'}"
+                >
+                  {tipo}
+                </button>
+              {/each}
+            {/if}
           </div>
         {/if}
       </div>

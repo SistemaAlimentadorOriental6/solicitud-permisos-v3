@@ -85,6 +85,7 @@ const initialState: AuthState = {
 
 function createAuthStore() {
   const { subscribe, set, update } = writable<AuthState>(initialState);
+  let initialized = false;
 
   return {
     subscribe,
@@ -113,6 +114,8 @@ function createAuthStore() {
           isLoading: false,
           error: null,
         }));
+
+        initialized = true;
 
         if (response.token && response.usuario) {
           guardarSesion(response.token, response.usuario, expiresAt);
@@ -143,21 +146,29 @@ function createAuthStore() {
       try {
         await logoutApi();
       } finally {
+        initialized = false;
         limpiarSesion();
         set({ ...initialState, isChecking: false });
       }
     },
 
     async checkAuth() {
+      if (initialized) {
+        update((state) => ({ ...state, isChecking: false }));
+        return;
+      }
+
       const token = storage.getItem(STORAGE_KEYS.token);
       const userStr = storage.getItem(STORAGE_KEYS.user);
 
       if (!token || !userStr) {
+        initialized = true;
         update((state) => ({ ...state, isChecking: false }));
         return;
       }
 
       if (isTokenExpired(token)) {
+        initialized = false;
         limpiarSesion();
         set({ ...initialState, isChecking: false });
         return;
@@ -175,6 +186,8 @@ function createAuthStore() {
           isChecking: false,
         }));
 
+        initialized = true;
+
         const response = await getMeApi(token);
         if (response.success && response.usuario) {
           const expiresAt = getTokenExpiration(token) ?? Date.now() + expiresIn * 1000;
@@ -182,6 +195,7 @@ function createAuthStore() {
           update((state) => ({ ...state, user: response.usuario || null }));
         }
       } catch {
+        initialized = false;
         limpiarSesion();
         set({ ...initialState, isChecking: false });
       }

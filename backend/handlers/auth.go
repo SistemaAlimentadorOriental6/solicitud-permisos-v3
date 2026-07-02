@@ -179,6 +179,8 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
+	foto, _ := getEmployeePhoto(req.Cedula)
+
 	return c.JSON(models.LoginResponse{
 		Success: true,
 		Message: "Login exitoso",
@@ -189,6 +191,7 @@ func Login(c *fiber.Ctx) error {
 			Cargo:  cargo,
 			Cedula: req.Cedula,
 			Area:   area,
+			Foto:   foto,
 		},
 	})
 }

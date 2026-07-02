@@ -218,6 +218,19 @@
     if (e.key === "Escape" && showModal) closeModal();
   }
 
+  function portal(node: HTMLElement) {
+    if (typeof document !== "undefined") {
+      document.body.appendChild(node);
+    }
+    return {
+      destroy() {
+        if (node.parentNode) {
+          node.parentNode.removeChild(node);
+        }
+      },
+    };
+  }
+
   onMount(() => {
     authStore.checkAuth();
     solicitudesStore.fetchSolicitudes();
@@ -323,11 +336,27 @@
 
   <!-- Loading State -->
   {#if $solicitudesStore.isLoading}
-    <div class="flex flex-col items-center justify-center py-20 gap-4">
+    <div class="animate-pulse flex flex-col gap-4">
+      <!-- Filtros Header Skeleton -->
       <div
-        class="w-10 h-10 border-3 border-primario border-t-transparent rounded-full animate-spin"
+        class="w-full bg-white rounded-2xl border border-fondo-soft h-14"
       ></div>
-      <p class="text-sm text-texto-grey font-medium">Cargando solicitudes...</p>
+
+      <!-- Solicitud Cards Skeleton -->
+      <div class="flex flex-col gap-3">
+        {#each Array(4) as _}
+          <div
+            class="bg-white rounded-2xl border border-fondo-soft p-5 flex gap-4 items-center"
+          >
+            <div class="w-10 h-10 bg-fondo-soft rounded-xl flex-shrink-0"></div>
+            <div class="flex-1">
+              <div class="h-4 bg-fondo-soft rounded w-1/3 mb-2"></div>
+              <div class="h-3 bg-fondo-soft rounded w-1/4"></div>
+            </div>
+            <div class="w-20 h-6 bg-fondo-soft rounded-full"></div>
+          </div>
+        {/each}
+      </div>
     </div>
   {:else if $solicitudesStore.error}
     <div class="flex flex-col items-center justify-center py-20 gap-4">
@@ -470,161 +499,156 @@
                   class="bg-white rounded-2xl border border-fondo-soft overflow-hidden hover:shadow-lg hover:border-primario/20 transition-all duration-300 cursor-pointer"
                   onclick={() => openModal(solicitud)}
                 >
-                <div class="p-5">
-                  <div class="flex items-start gap-4">
-                    <div
-                      class="w-10 h-10 {config.bg} rounded-xl flex items-center justify-center flex-shrink-0"
-                    >
-                      <HugeiconsIcon
-                        icon={config.icon}
-                        size={20}
-                        class={config.color}
-                      />
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-start justify-between gap-3">
-                        <div>
-                          <h3
-                            class="font-display text-sm font-bold text-texto-dark tracking-tight capitalize"
+                  <div class="p-5">
+                    <div class="flex items-start gap-4">
+                      <div
+                        class="w-10 h-10 {config.bg} rounded-xl flex items-center justify-center flex-shrink-0"
+                      >
+                        <HugeiconsIcon
+                          icon={config.icon}
+                          size={20}
+                          class={config.color}
+                        />
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-3">
+                          <div>
+                            <h3
+                              class="font-display text-sm font-bold text-texto-dark tracking-tight capitalize"
+                            >
+                              {solicitud.tipo_novedad}
+                            </h3>
+                            <p class="text-[11px] text-texto-grey mt-0.5">
+                              #{solicitud.id} • {formatDateTime(
+                                solicitud.fecha_creacion,
+                              )}
+                            </p>
+                          </div>
+                          <span
+                            class="px-3 py-1 bg-primario/10 text-primario text-[10px] font-bold uppercase tracking-wider rounded-full flex-shrink-0"
                           >
-                            {solicitud.tipo_novedad}
-                          </h3>
-                          <p class="text-[11px] text-texto-grey mt-0.5">
-                            #{solicitud.id} • {formatDateTime(
-                              solicitud.fecha_creacion,
-                            )}
-                          </p>
+                            Permiso
+                          </span>
                         </div>
-                        <span
-                          class="px-3 py-1 bg-primario/10 text-primario text-[10px] font-bold uppercase tracking-wider rounded-full flex-shrink-0"
-                        >
-                          Permiso
-                        </span>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                <div class="px-5 pb-5 space-y-3">
-                  <div
-                    class="bg-fondo-soft/50 rounded-xl px-4 py-3 flex items-center gap-3"
-                  >
-                    <svg
-                      class="w-4 h-4 text-texto-grey flex-shrink-0"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                    >
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                    <div>
-                      <p
-                        class="text-[10px] font-semibold text-texto-grey uppercase tracking-wider"
-                      >
-                        Fecha
-                      </p>
-                      <p class="text-sm font-medium text-texto-dark">
-                        {formatDate(solicitud.fecha_solicitud)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {#if solicitud.descripcion}
+                  <div class="px-5 pb-5 space-y-3">
                     <div
-                      class="border border-dashed border-fondo-soft rounded-xl px-4 py-3"
+                      class="bg-fondo-soft/50 rounded-xl px-4 py-3 flex items-center gap-3"
                     >
-                      <p
-                        class="text-[10px] font-semibold text-texto-grey uppercase tracking-wider mb-1"
+                      <svg
+                        class="w-4 h-4 text-texto-grey flex-shrink-0"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
                       >
-                        Descripción
-                      </p>
-                      <p class="text-sm text-texto-dark">
-                        "{solicitud.descripcion}"
-                      </p>
+                        <rect
+                          x="3"
+                          y="4"
+                          width="18"
+                          height="18"
+                          rx="2"
+                          ry="2"
+                        />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      <div>
+                        <p
+                          class="text-[10px] font-semibold text-texto-grey uppercase tracking-wider"
+                        >
+                          Fecha
+                        </p>
+                        <p class="text-sm font-medium text-texto-dark">
+                          {formatDate(solicitud.fecha_solicitud)}
+                        </p>
+                      </div>
                     </div>
-                  {/if}
 
-                  {#if solicitud.respuesta_admin}
-                    <div class="bg-fondo-soft/50 rounded-xl px-4 py-3">
-                      <p
-                        class="text-[10px] font-semibold text-texto-grey uppercase tracking-wider mb-1"
+                    {#if solicitud.descripcion}
+                      <div
+                        class="border border-dashed border-fondo-soft rounded-xl px-4 py-3"
                       >
-                        Respuesta
-                      </p>
-                      <p class="text-sm text-texto-dark">
-                        {solicitud.respuesta_admin}
-                      </p>
-                    </div>
-                  {/if}
-                </div>
+                        <p
+                          class="text-[10px] font-semibold text-texto-grey uppercase tracking-wider mb-1"
+                        >
+                          Descripción
+                        </p>
+                        <p class="text-sm text-texto-dark">
+                          "{solicitud.descripcion}"
+                        </p>
+                      </div>
+                    {/if}
 
-                <div
-                  class="px-5 py-3.5 border-t border-fondo-soft flex items-center justify-between"
-                >
-                  <div class="flex items-center gap-2">
-                    <span
-                      class="w-2 h-2 rounded-full {config.color ===
-                      'text-primario'
-                        ? 'bg-primario'
-                        : config.color === 'text-amber-500'
-                          ? 'bg-amber-500'
-                          : 'bg-error'}"
-                    ></span>
-                    <span
-                      class="text-[11px] font-bold uppercase tracking-wider {config.color}"
-                      >{config.label}</span
-                    >
+                    {#if solicitud.respuesta_admin}
+                      <div class="bg-fondo-soft/50 rounded-xl px-4 py-3">
+                        <p
+                          class="text-[10px] font-semibold text-texto-grey uppercase tracking-wider mb-1"
+                        >
+                          Respuesta
+                        </p>
+                        <p class="text-sm text-texto-dark">
+                          {solicitud.respuesta_admin}
+                        </p>
+                      </div>
+                    {/if}
                   </div>
-                  <button
-                    onclick={() => openModal(solicitud)}
-                    class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primario hover:text-primario-dark transition-colors"
+
+                  <div
+                    class="px-5 py-3.5 border-t border-fondo-soft flex items-center justify-between"
                   >
-                    Detalles
-                    <svg
-                      class="w-3.5 h-3.5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.5"
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="w-2 h-2 rounded-full {config.color ===
+                        'text-primario'
+                          ? 'bg-primario'
+                          : config.color === 'text-amber-500'
+                            ? 'bg-amber-500'
+                            : 'bg-error'}"
+                      ></span>
+                      <span
+                        class="text-[11px] font-bold uppercase tracking-wider {config.color}"
+                        >{config.label}</span
+                      >
+                    </div>
+                    <button
+                      onclick={() => openModal(solicitud)}
+                      class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primario hover:text-primario-dark transition-colors"
                     >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </button>
+                      Detalles
+                      <svg
+                        class="w-3.5 h-3.5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        {/each}
+          {/each}
         </div>
       {/if}
     </div>
   {/if}
 </div>
 
-<style>
-  :global(.custom-scrollbar::-webkit-scrollbar) {
-    width: 6px;
-  }
-  :global(.custom-scrollbar::-webkit-scrollbar-track) {
-    background: transparent;
-  }
-  :global(.custom-scrollbar::-webkit-scrollbar-thumb) {
-    background: #d1d5db;
-    border-radius: 999px;
-  }
-  :global(.custom-scrollbar::-webkit-scrollbar-thumb:hover) {
-    background: #9ca3af;
-  }
-</style>
-
 <!-- Modal Panel -->
 {#if showModal && selectedSolicitud}
   {@const config = estadoConfig[selectedSolicitud.estado]}
-  <div class="fixed inset-0 z-50" transition:fade={{ duration: 200 }}>
+  <div
+    use:portal
+    class="fixed inset-0 z-[100]"
+    transition:fade={{ duration: 200 }}
+  >
     <div
       class="absolute inset-0 bg-texto-dark/30 backdrop-blur-sm"
       onclick={closeModal}
@@ -1053,15 +1077,22 @@
           </div>
         </div>
       </div>
-
-      <div class="p-6 pt-4">
-        <button
-          onclick={closeModal}
-          class="w-full py-3 bg-texto-dark text-white text-sm font-semibold rounded-xl hover:bg-texto-dark/90 active:scale-[0.98] transition-all duration-200"
-        >
-          Cerrar
-        </button>
-      </div>
     </div>
   </div>
 {/if}
+
+<style>
+  :global(.custom-scrollbar::-webkit-scrollbar) {
+    width: 6px;
+  }
+  :global(.custom-scrollbar::-webkit-scrollbar-track) {
+    background: transparent;
+  }
+  :global(.custom-scrollbar::-webkit-scrollbar-thumb) {
+    background: #d1d5db;
+    border-radius: 999px;
+  }
+  :global(.custom-scrollbar::-webkit-scrollbar-thumb:hover) {
+    background: #9ca3af;
+  }
+</style>

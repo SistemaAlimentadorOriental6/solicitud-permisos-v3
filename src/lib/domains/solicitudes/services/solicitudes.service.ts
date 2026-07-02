@@ -212,3 +212,58 @@ export async function eliminarSolicitud(id: number): Promise<EliminarSolicitudRe
 
   return data;
 }
+
+export interface RespuestasRapidasResponse {
+  success: boolean;
+  respuestas: {
+    id: number;
+    area: string | null;
+    respuesta: string;
+    creado_en: string;
+  }[];
+}
+
+export async function getRespuestasRapidas(area?: string): Promise<RespuestasRapidasResponse> {
+  const token = localStorage.getItem('token');
+  const url = area
+    ? `${API_BASE_URL}/api/solicitudes/respuestas-rapidas?area=${area}`
+    : `${API_BASE_URL}/api/solicitudes/respuestas-rapidas`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Error al cargar respuestas rápidas');
+  }
+
+  if (!data.respuestas) {
+    data.respuestas = [];
+  }
+
+  return data;
+}
+
+export async function crearRespuestaRapida(respuesta: string, area?: string): Promise<{ success: boolean; message: string }> {
+  const token = localStorage.getItem('token');
+
+  const response = await fetch(`${API_BASE_URL}/api/solicitudes/respuestas-rapidas`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ respuesta, area: area ?? '' }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Error al crear la respuesta rápida');
+  }
+
+  return data;
+}

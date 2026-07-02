@@ -39,7 +39,7 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
 }
 
 export async function logout(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  // Cierre de sesión inmediato
 }
 
 export async function getMe(token: string): Promise<LoginResponse> {

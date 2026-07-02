@@ -21,11 +21,48 @@
   let horaCita = $state("");
   let showDropdown = $state(false);
   let showSubPoliticaDropdown = $state(false);
-  let archivos = $state<Array<{ file: File; id: string }>>([]);
+  let archivos = $state<Array<{ file: File; id: string; previewUrl?: string }>>([]);
   let fileError = $state("");
   let fileInput: HTMLInputElement = $state()!;
   let isSubmitting = $state(false);
   let isLoadingDates = $state(true);
+  let isDragging = $state(false);
+
+  function handleDragOver(e: DragEvent) {
+    e.preventDefault();
+    if (archivos.length < MAX_ARCHIVOS) {
+      isDragging = true;
+    }
+  }
+
+  function handleDragLeave() {
+    isDragging = false;
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    isDragging = false;
+    if (archivos.length >= MAX_ARCHIVOS) return;
+    if (e.dataTransfer?.files) {
+      handleFiles(e.dataTransfer.files);
+    }
+  }
+
+  const isFormValid = $derived.by(() => {
+    if (!tipoNovedad) return false;
+    if (fechasSeleccionadas.length === 0) return false;
+    if (
+      tipoNovedad === "Deseo de laborar en alguna Sub política" &&
+      !subPoliticaSeleccionada
+    ) {
+      return false;
+    }
+    if (tipoNovedad === "Cita médica") {
+      if (!horaCita) return false;
+      if (archivos.length === 0) return false;
+    }
+    return true;
+  });
 
   // Auto-convertir a Licencia no remunerada cuando se seleccionan 2 o más fechas
   $effect(() => {
@@ -193,7 +230,7 @@
       const area = $currentUser?.area || "operaciones";
       const res = await getFechasSolicitudes(area);
       if (res.success && res.fechas) {
-        apiDates = res.fechas.map(mapFechaToDateInfo);
+        apiDates = res.fechas.filter((f) => f.activo).map(mapFechaToDateInfo);
       } else {
         apiDates = [];
         if (res.message) toast.error(res.message);
@@ -251,13 +288,23 @@
         fileError = `El archivo ${file.name} ya está agregado`;
         continue;
       }
-      archivos = [...archivos, { file, id: crypto.randomUUID() }];
+      
+      let previewUrl = "";
+      if (file.type.startsWith("image/")) {
+        previewUrl = URL.createObjectURL(file);
+      }
+      
+      archivos = [...archivos, { file, id: crypto.randomUUID(), previewUrl }];
     }
 
     if (fileInput) fileInput.value = "";
   }
 
   function removeFile(id: string) {
+    const found = archivos.find((a) => a.id === id);
+    if (found?.previewUrl) {
+      URL.revokeObjectURL(found.previewUrl);
+    }
     archivos = archivos.filter((a) => a.id !== id);
     fileError = "";
   }
@@ -474,6 +521,14 @@
           </div>
         </div>
       </div>
+    {:else}
+      <div class="flex items-center gap-4 animate-pulse">
+        <div class="w-14 h-14 rounded-full bg-fondo-soft/75 flex-shrink-0"></div>
+        <div class="flex-1">
+          <div class="h-5 bg-fondo-soft/70 rounded w-1/3 mb-2"></div>
+          <div class="h-3 bg-fondo-soft/70 rounded w-1/4"></div>
+        </div>
+      </div>
     {/if}
   </div>
 
@@ -559,10 +614,11 @@
           <button
             type="button"
             onclick={() => (showDropdown = !showDropdown)}
-            disabled={fechasSeleccionadas.length >= 2}
+            disabled={fechasSeleccionadas.length >= 2 || $permisosStore.isLoading}
             class="w-full py-3.5 px-4 bg-fondo-soft border-2 border-transparent rounded-2xl text-left font-medium text-sm focus:outline-none focus:bg-white focus:border-primario transition-all duration-200 flex items-center justify-between disabled:opacity-70 disabled:cursor-not-allowed"
             class:text-texto-grey={!tipoNovedad}
             class:text-texto-dark={tipoNovedad}
+            class:animate-pulse={$permisosStore.isLoading}
           >
             <span class="flex items-center gap-2">
               {tipoNovedad ||
@@ -591,7 +647,7 @@
           {#if showDropdown}
             <div
               data-dropdown
-              class="absolute z-50 w-full mt-2 bg-white rounded-2xl border border-fondo-soft shadow-xl overflow-hidden max-h-64 overflow-y-auto"
+              class="absolute z-50 w-full mt-2 bg-white rounded-2xl border border-fondo-soft shadow-xl overflow-hidden max-h-64 overflow-y-auto custom-scrollbar"
               transition:slide={{ duration: 200 }}
             >
               {#each $permisosStore.tipos as tipo}
@@ -645,7 +701,7 @@
             {#if showSubPoliticaDropdown}
               <div
                 data-dropdown
-                class="absolute z-50 w-full mt-2 bg-white rounded-2xl border border-fondo-soft shadow-xl overflow-hidden max-h-64 overflow-y-auto"
+                class="absolute z-50 w-full mt-2 bg-white rounded-2xl border border-fondo-soft shadow-xl overflow-hidden max-h-64 overflow-y-auto custom-scrollbar"
                 transition:slide={{ duration: 200 }}
               >
                 {#each $permisosStore.politicas as politica}
@@ -699,54 +755,66 @@
         </label>
 
         <div class="flex flex-wrap gap-1.5">
-          {#each allDateInputs as info, i}
-            {@const isSelected = isDateSelected(info.date)}
-            <button
-              type="button"
-              onclick={() => tipoNovedad && toggleDate(info.date)}
-              disabled={!tipoNovedad}
-              class="flex-shrink-0 w-[calc(50%-6px)] sm:w-[calc(14.28%-10px)] py-4 flex flex-col items-center gap-1 transition-all duration-200 ease-out rounded-2xl relative
-              {isSelected
-                ? 'bg-primario'
-                : !tipoNovedad
-                  ? 'bg-fondo-soft/50 cursor-not-allowed opacity-50'
-                  : 'bg-fondo-soft hover:bg-fondo-soft/70'}"
-            >
-              {#if info.isToday}
-                <span
-                  class="absolute -top-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-green-500 text-white text-[8px] font-bold rounded"
-                  >HOY</span
-                >
-              {/if}
-              {#if info.isHoliday}
-                <span
-                  class="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-400 rounded-full"
-                ></span>
-              {/if}
-              <span
-                class="text-[10px] font-bold uppercase tracking-widest transition-colors duration-200
-              {isSelected ? 'text-white/80' : 'text-texto-grey'}"
-                >{info.dayName.slice(0, 3)}</span
+          {#if isLoadingDates}
+            {#each Array(7) as _, i}
+              <div
+                class="flex-shrink-0 w-[calc(50%-6px)] sm:w-[calc(14.28%-10px)] py-4 flex flex-col items-center gap-2 bg-fondo-soft/50 animate-pulse rounded-2xl"
               >
-              <span
-                class="text-3xl font-extrabold leading-none transition-colors duration-200
-              {isSelected ? 'text-white' : 'text-texto-dark'}"
-                >{info.dayNumber}</span
-              >
-              <div class="flex flex-col items-center gap-0.5">
-                <span
-                  class="text-[10px] font-semibold leading-tight transition-colors duration-200
-                {isSelected ? 'text-white/90' : 'text-texto-grey'}"
-                  >{info.monthName.slice(0, 3)}</span
-                >
-                <span
-                  class="text-[9px] font-medium leading-tight transition-colors duration-200
-                {isSelected ? 'text-white/70' : 'text-texto-grey/70'}"
-                  >{info.year}</span
-                >
+                <div class="h-3 w-8 bg-texto-grey/20 rounded"></div>
+                <div class="h-8 w-10 bg-texto-dark/10 rounded my-1"></div>
+                <div class="h-3 w-12 bg-texto-grey/20 rounded"></div>
               </div>
-            </button>
-          {/each}
+            {/each}
+          {:else}
+            {#each allDateInputs as info, i}
+              {@const isSelected = isDateSelected(info.date)}
+              <button
+                type="button"
+                onclick={() => tipoNovedad && toggleDate(info.date)}
+                disabled={!tipoNovedad}
+                class="flex-shrink-0 w-[calc(50%-6px)] sm:w-[calc(14.28%-10px)] py-4 flex flex-col items-center gap-1 transition-all duration-200 ease-out rounded-2xl relative
+                {isSelected
+                  ? 'bg-primario'
+                  : !tipoNovedad
+                    ? 'bg-fondo-soft/50 cursor-not-allowed opacity-50'
+                    : 'bg-fondo-soft hover:bg-fondo-soft/70'}"
+              >
+                {#if info.isToday}
+                  <span
+                    class="absolute -top-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-green-500 text-white text-[8px] font-bold rounded"
+                    >HOY</span
+                  >
+                {/if}
+                {#if info.isHoliday}
+                  <span
+                    class="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-400 rounded-full"
+                  ></span>
+                {/if}
+                <span
+                  class="text-[10px] font-bold uppercase tracking-widest transition-colors duration-200
+                {isSelected ? 'text-white/80' : 'text-texto-grey'}"
+                  >{info.dayName.slice(0, 3)}</span
+                >
+                <span
+                  class="text-3xl font-extrabold leading-none transition-colors duration-200
+                {isSelected ? 'text-white' : 'text-texto-dark'}"
+                  >{info.dayNumber}</span
+                >
+                <div class="flex flex-col items-center gap-0.5">
+                  <span
+                    class="text-[10px] font-semibold leading-tight transition-colors duration-200
+                  {isSelected ? 'text-white/90' : 'text-texto-grey'}"
+                    >{info.monthName.slice(0, 3)}</span
+                  >
+                  <span
+                    class="text-[9px] font-medium leading-tight transition-colors duration-200
+                  {isSelected ? 'text-white/70' : 'text-texto-grey/70'}"
+                    >{info.year}</span
+                  >
+                </div>
+              </button>
+            {/each}
+          {/if}
         </div>
 
         {#if fechasSeleccionadas.length > 0}
@@ -857,8 +925,13 @@
             class="border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-200 cursor-pointer
             {archivos.length >= MAX_ARCHIVOS
               ? 'border-fondo-soft bg-fondo-soft/50'
-              : 'border-fondo-soft bg-fondo-soft/30 hover:border-primario/40 hover:bg-primario/5'}"
+              : isDragging
+                ? 'border-primario bg-primario/10 scale-[1.01] border-solid'
+                : 'border-fondo-soft bg-fondo-soft/30 hover:border-primario/40 hover:bg-primario/5'}"
             onclick={() => fileInput?.click()}
+            ondragover={handleDragOver}
+            ondragleave={handleDragLeave}
+            ondrop={handleDrop}
           >
             <input
               type="file"
@@ -915,9 +988,11 @@
                   class="flex items-center gap-3 bg-white border border-fondo-soft rounded-xl px-4 py-3 animate-fade-in"
                 >
                   <div
-                    class="w-9 h-9 bg-fondo-soft rounded-lg flex items-center justify-center flex-shrink-0"
+                    class="w-9 h-9 bg-fondo-soft rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
                   >
-                    {#if getFileIcon(archivo.file.type) === "pdf"}
+                    {#if archivo.previewUrl}
+                      <img src={archivo.previewUrl} alt="Preview" class="w-full h-full object-cover" />
+                    {:else if getFileIcon(archivo.file.type) === "pdf"}
                       <svg
                         class="w-5 h-5 text-red-500"
                         viewBox="0 0 24 24"
@@ -1012,7 +1087,7 @@
 
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || !isFormValid}
         class="w-full py-4 bg-primario text-white font-bold text-sm rounded-2xl shadow-lg shadow-primario/25 hover:shadow-xl hover:shadow-primario/30 hover:-translate-y-0.5 active:scale-95 transition-all duration-250 uppercase tracking-wider mt-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:active:scale-100 flex items-center justify-center gap-2"
       >
         {#if isSubmitting}
@@ -1044,6 +1119,20 @@
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 999px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
   }
 
   @keyframes fadeInUp {

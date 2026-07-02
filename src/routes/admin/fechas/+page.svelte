@@ -603,62 +603,69 @@
     </div>
   {/if}
 
-  <div class="bg-white rounded-2xl border border-fondo-soft p-6 mb-6">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-          <svg class="w-5 h-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
+  {#if isLoading}
+    <div class="bg-white rounded-2xl border border-fondo-soft p-6 mb-6">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3 w-2/3">
+          <div class="w-10 h-10 bg-fondo-soft rounded-xl animate-pulse"></div>
+          <div class="space-y-2 flex-1">
+            <div class="h-3 w-24 bg-fondo-soft rounded-full animate-pulse"></div>
+            <div class="h-4 w-48 bg-fondo-soft rounded-lg animate-pulse"></div>
+          </div>
         </div>
-        <div>
-          <p class="text-xs font-semibold text-texto-grey uppercase tracking-wider">Cambio de fechas</p>
-          <p class="text-sm font-bold text-texto-dark">{switchDate.label}</p>
-          {#if semanaLabel}
-            <p class="text-xs text-texto-grey mt-0.5">Semana: {semanaLabel}</p>
-          {/if}
+        <div class="flex gap-2">
+          <div class="w-16 h-8 bg-fondo-soft rounded-lg animate-pulse"></div>
+          <div class="w-24 h-8 bg-fondo-soft rounded-lg animate-pulse"></div>
         </div>
-      </div>
-      <div class="flex items-center gap-3">
-        <button
-          onclick={openSwitchModal}
-          class="px-3 py-1.5 text-xs font-semibold text-primario bg-primario/10 rounded-lg hover:bg-primario/20 transition-all"
-        >
-          Editar
-        </button>
-        <button
-          onclick={handleSave}
-          disabled={!hasChanges() || isSaving}
-          class="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5
-            {hasChanges() && !isSaving
-              ? 'bg-primario text-white hover:bg-primario-dark'
-              : 'bg-fondo-soft text-texto-grey cursor-not-allowed'}"
-        >
-          {#if isSaving}
-            <svg class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-            </svg>
-          {/if}
-          Guardar cambios
-        </button>
       </div>
     </div>
-  </div>
-
-  <div class="bg-white rounded-2xl border border-fondo-soft p-6 relative">
-    {#if isLoading}
-      <div class="absolute inset-0 bg-white/80 rounded-2xl flex items-center justify-center z-10">
-        <div class="flex flex-col items-center gap-3">
-          <svg class="animate-spin w-8 h-8 text-primario" viewBox="0 0 24 24" fill="none">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-          </svg>
-          <span class="text-sm font-medium text-texto-grey">Cargando fechas...</span>
+  {:else}
+    <div class="bg-white rounded-2xl border border-fondo-soft p-6 mb-6">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+            <svg class="w-5 h-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-texto-grey uppercase tracking-wider">Cambio de fechas</p>
+            <p class="text-sm font-bold text-texto-dark">{switchDate.label}</p>
+            {#if semanaLabel}
+              <p class="text-xs text-texto-grey mt-0.5">Semana: {semanaLabel}</p>
+            {/if}
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <button
+            onclick={openSwitchModal}
+            class="px-3 py-1.5 text-xs font-semibold text-primario bg-primario/10 rounded-lg hover:bg-primario/20 transition-all"
+          >
+            Editar
+          </button>
+          <button
+            onclick={handleSave}
+            disabled={!hasChanges() || isSaving}
+            class="px-4 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5
+              {hasChanges() && !isSaving
+                ? 'bg-primario text-white hover:bg-primario-dark'
+                : 'bg-fondo-soft text-texto-grey cursor-not-allowed'}"
+          >
+            {#if isSaving}
+              <svg class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            {/if}
+            Guardar cambios
+          </button>
         </div>
       </div>
-    {/if}
+    </div>
+  {/if}
+
+  <div class="bg-white rounded-2xl border border-fondo-soft p-6 relative">
 
     <div class="flex items-center justify-between mb-6">
       <button onclick={prevMonth} class="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-fondo-soft text-texto-grey hover:text-texto-dark transition-all">
@@ -685,30 +692,36 @@
     </div>
 
     <div class="grid grid-cols-7 gap-1">
-      {#each monthWeeks as week}
-        {#each week as day}
-          <button
-            onclick={() => day && handleDayClick(day)}
-            class="aspect-square flex flex-col items-center justify-center rounded-xl transition-all duration-200 relative
-              {day 
-                ? isDateSelected(day.dateStr) 
-                  ? 'bg-primario text-white' 
-                  : 'hover:bg-fondo-soft text-texto-dark' 
-                : 'cursor-default'}"
-            disabled={!day}
-          >
-            {#if day}
-              {#if day.isHoliday}
-                <span class="text-[8px] font-bold text-error uppercase mb-0.5">Festivo</span>
-              {/if}
-              <span class="text-lg font-bold">{day.dayNumber}</span>
-              {#if day.isDefault && isDateSelected(day.dateStr)}
-                <span class="absolute top-1 right-1 w-1.5 h-1.5 bg-white rounded-full"></span>
-              {/if}
-            {/if}
-          </button>
+      {#if isLoading}
+        {#each Array(35) as _}
+          <div class="aspect-square bg-fondo-soft rounded-xl animate-pulse"></div>
         {/each}
-      {/each}
+      {:else}
+        {#each monthWeeks as week}
+          {#each week as day}
+            <button
+              onclick={() => day && handleDayClick(day)}
+              class="aspect-square flex flex-col items-center justify-center rounded-xl transition-all duration-200 relative
+                {day 
+                  ? isDateSelected(day.dateStr) 
+                    ? 'bg-primario text-white' 
+                    : 'hover:bg-fondo-soft text-texto-dark' 
+                  : 'cursor-default'}"
+              disabled={!day}
+            >
+              {#if day}
+                {#if day.isHoliday}
+                  <span class="text-[8px] font-bold text-error uppercase mb-0.5">Festivo</span>
+                {/if}
+                <span class="text-lg font-bold">{day.dayNumber}</span>
+                {#if day.isDefault && isDateSelected(day.dateStr)}
+                  <span class="absolute top-1 right-1 w-1.5 h-1.5 bg-white rounded-full"></span>
+                {/if}
+              {/if}
+            </button>
+          {/each}
+        {/each}
+      {/if}
     </div>
   </div>
 
