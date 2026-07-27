@@ -1,6 +1,6 @@
 import type { User } from '../types/auth.types';
 
-export const CODIGOS_ADMIN = ['9999', '0000', '1303', '0101', '7654', '8246'] as const;
+export const CODIGOS_ADMIN = ['9999', '0000', '1303', '0101', '7654', '6666', '5090'] as const;
 
 export const AREAS_ADMIN = ['se_operaciones', 'se_mantenimiento', 'se_comunicaciones', 'se_via_vigilantes'] as const;
 

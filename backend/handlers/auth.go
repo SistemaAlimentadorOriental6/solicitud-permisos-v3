@@ -45,7 +45,7 @@ func Login(c *fiber.Ctx) error {
 	var cargo string
 
 	if req.Codigo != "" {
-		codigosAdmin := []string{"9999", "0000", "1303", "0101", "7654", "8246"}
+		codigosAdmin := []string{"9999", "0000", "1303", "0101", "7654", "6666", "5090"}
 		esAdmin := false
 		for _, adminCode := range codigosAdmin {
 			if req.Codigo == adminCode {
@@ -405,7 +405,7 @@ func findViaVigilantesEmpleadoByCedula(cedula string) (*models.Empleado, error) 
 func Me(c *fiber.Ctx) error {
 	claims := c.Locals("user").(*utils.Claims)
 
-	codigosAdmin := []string{"9999", "0000", "1303", "0101", "7654", "8246"}
+	codigosAdmin := []string{"9999", "0000", "1303", "0101", "7654", "6666", "5090"}
 	esAdmin := false
 	for _, adminCode := range codigosAdmin {
 		if claims.Codigo == adminCode {

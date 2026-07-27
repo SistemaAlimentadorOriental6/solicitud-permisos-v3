@@ -1,4 +1,6 @@
 packages: []
+allowBuilds:
+  '@hugeicons/svelte': false
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - esbuild

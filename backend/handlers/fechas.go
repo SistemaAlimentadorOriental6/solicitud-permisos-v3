@@ -184,11 +184,22 @@ func calcularSemanaInicio(area string) time.Time {
 
 	switchDia, switchHora, switchMin := getSwitchConfig(area)
 
+	// En Go, Sunday=0. Para comparar correctamente en contexto de semana laboral
+	// (Lun=1 ... Sab=6, Dom=7), normalizamos el domingo a 7.
+	efectiveWeekday := weekday
+	if weekday == time.Sunday {
+		efectiveWeekday = 7
+	}
+	efectiveSwitchDia := switchDia
+	if switchDia == time.Sunday {
+		efectiveSwitchDia = 7
+	}
+
 	weeksToAdd := 7
 	afterSwitch := false
-	if weekday > switchDia {
+	if efectiveWeekday > efectiveSwitchDia {
 		afterSwitch = true
-	} else if weekday == switchDia {
+	} else if efectiveWeekday == efectiveSwitchDia {
 		if hour > switchHora || (hour == switchHora && now.Minute() >= switchMin) {
 			afterSwitch = true
 		}
