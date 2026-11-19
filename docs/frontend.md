@@ -17,7 +17,6 @@ Aplicación web para la gestión y solicitud de **permisos laborales** (`solicit
 9. [Variables de entorno](#9-variables-de-entorno)
 10. [Comandos](#10-comandos)
 11. [Despliegue](#11-despliegue)
-12. [Puntos de mejora y riesgos](#12-puntos-de-mejora-y-riesgos)
 
 ---
 
@@ -209,14 +208,3 @@ El workflow [`.github/workflows/ci-cd.yml`](../.github/workflows/ci-cd.yml) auto
 4. Inicia/reinicia la aplicación con **PM2** bajo el nombre `solicitud_permisos_front` ejecutando `pnpm run preview` en el puerto **3047** (`--host 0.0.0.0 --port 3047`).
 
 ---
-
-## 12. Puntos de mejora y riesgos
-
-| Prioridad | Tema | Observación / Acción sugerida |
-|---|---|---|
-| **Alta** | `vite preview` en producción | En [`ci-cd.yml`](../.github/workflows/ci-cd.yml) se levanta el frontend con `pnpm run preview` (`vite preview --port 3047`), pensado para pruebas locales y no como servidor de producción; considerar `@sveltejs/adapter-node` o servir archivos estáticos con Nginx. |
-| **Alta** | Token en `localStorage` | Guardar el JWT en `localStorage` expone la sesión ante posibles ataques XSS; evaluar cookies `HttpOnly` o políticas CSP estrictas. |
-| **Media** | Roles y códigos admin en cliente | `CODIGOS_ADMIN` está replicado en [`permissions.ts`](../src/lib/domains/auth/utils/permissions.ts); la autorización real debe depender del backend y venir declarada como rol/permisos en el JWT o `/api/me`. |
-| **Media** | `VITE_API_DESEMPENO_URL` ausente en `.env.example` y CI/CD | `api.ts` usa `VITE_API_DESEMPENO_URL` (por defecto `http://localhost:3040`), pero no está declarada en `.env.example` ni inyectada en `ci-cd.yml`. |
-| **Media** | Logs de depuración en producción | Existen `console.log('[AUTH DEBUG] ...')` en `auth.store.ts` que imprimen datos de login; eliminarlos o condicionarlos a `import.meta.env.DEV`. |
-| **Baja** | Pruebas de ejemplo únicamente | Los tests actuales en `src/lib/vitest-examples/` son de plantilla; agregar pruebas para `permissions.ts`, `jwt.ts` y stores críticos. |
