@@ -17,7 +17,6 @@ API REST para el sistema de **solicitud de permisos laborales** (`solicitud-perm
 9. [Variables de entorno](#9-variables-de-entorno)
 10. [Comandos](#10-comandos)
 11. [Despliegue](#11-despliegue)
-12. [Puntos de mejora y riesgos](#12-puntos-de-mejora-y-riesgos)
 
 ---
 
@@ -303,15 +302,3 @@ Definido en [`.github/workflows/ci-cd.yml`](../.github/workflows/ci-cd.yml) sobr
 4. Compila el binario en producción y lo gestiona con **PM2** bajo el nombre `solicitud_permisos_back` (`--interpreter none`).
 
 ---
-
-## 12. Puntos de mejora y riesgos
-
-| Prioridad | Tema | Observación / Acción sugerida |
-|---|---|---|
-| **Alta** | Discrepancia de variables MySQL en CI/CD | [`config.go`](../backend/internal/config/config.go) lee `DBPERMISOS_HOST`, `DBPERMISOS_NAME`, `DBPERMISOS_USER`, `DBPERMISOS_PASSWORD`, mientras [`ci-cd.yml`](../.github/workflows/ci-cd.yml) escribe `SP_HOST`, `SP_DATABASE`, `SP_USER`, `SP_PASSWORD`. Unificar los nombres de variables. |
-| **Alta** | Ruta del binario en PM2 (`ci-cd.yml`) | En `deploy`, `go build -o ./bin/backend` corre dentro de `backend/`, pero `pm2 start ./bin/backend` corre desde la raíz del proyecto (`/var/www/operaciones/solicitud-permisos-v3`). Ajustar la ruta a `./backend/bin/backend`. |
-| **Alta** | Autorización por rol en backend | `JWTAuth()` valida el token pero no restringe endpoints administrativos (`/api/admin/*`, `ResponderSolicitud`, `EliminarSolicitud`, `CrearAnuncio`, `UpdateFechas`) únicamente a códigos/áreas administrativas. |
-| **Alta** | `DBPERMISOS_*` fuera de `variablesRequeridas` | `config.LoadConfig` valida `DB_*`, `UNOEE_*` y `JWT_SECRET`, pero no exige las variables de MySQL al arrancar, fallando recién al hacer `PingContext`. |
-| **Media** | CORS abierto (`AllowOrigins: "*"`) | Restringir `AllowOrigins` a los dominios del frontend en producción mediante variable de entorno. |
-| **Media** | Códigos admin hardcodeados | `codigosAdmin` está definido en código en `handlers/auth.go` (y replicado en el frontend). Conviene manejar roles directamente desde la tabla `usuarios`. |
-| **Baja** | Sin suite de pruebas automatizadas | Agregar pruebas unitarias para `holidays`, `utils/jwt.go` y handlers críticos. |
